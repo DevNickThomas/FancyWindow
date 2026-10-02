@@ -102,7 +102,8 @@ fn cycling_highlights_the_focused_windows_zone() {
     assert_eq!(state.active_highlight(), None);
     cycle(&mut state, true, false);
     cycle(&mut state, true, false);
-    assert_eq!(state.active_highlight().map(|h| h.glow), Some(Rect::new(300.0, 0.0, 300.0, 600.0)));
+    // Middle column (300..600): visible 304..596, glow 3 DIP into the gaps.
+    assert_eq!(state.active_highlight().map(|h| h.glow), Some(Rect::new(301.0, 5.0, 298.0, 590.0)));
 }
 
 #[test]

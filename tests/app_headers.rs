@@ -29,8 +29,8 @@ fn headers_are_on_by_default_and_push_windows_down() {
     let mut state = two_columns();
     assert_eq!(state.header_height(), HEADER_HEIGHT);
     let effects = update(&mut state, Msg::WindowDropped { window: A, at: Point::new(200.0, 300.0), alt: true });
-    // Left column: header 0..28, then the usual 2 DIP gap.
-    assert_eq!(effects[0], Effect::Host { window: A, rect: Rect::new(2.0, 30.0, 394.0, 568.0) });
+    // Left column: visible from (8,8), header 28 tall, then the usual 2 DIP gap.
+    assert_eq!(effects[0], Effect::Host { window: A, rect: Rect::new(10.0, 38.0, 384.0, 552.0) });
 }
 
 #[test]
@@ -43,9 +43,9 @@ fn one_header_per_occupied_zone_with_title_number_and_close() {
     assert_eq!(a.window, A);
     assert_eq!(a.title, "notes.txt - Notepad");
     assert_eq!(a.number, 1);
-    // Left column's visible area stops at the splitter half (398).
-    assert_eq!(a.bounds, Rect::new(0.0, 0.0, 398.0, 28.0));
-    assert_eq!(a.close, Rect::new(398.0 - 5.0 - 18.0, 5.0, 18.0, 18.0));
+    // Left column's visible area: 8 in from the canvas edges, 4 short of the splitter.
+    assert_eq!(a.bounds, Rect::new(8.0, 8.0, 388.0, 28.0));
+    assert_eq!(a.close, Rect::new(396.0 - 5.0 - 18.0, 13.0, 18.0, 18.0));
     // B has no title yet, and is second in reading order.
     assert_eq!((headers[1].title.as_str(), headers[1].number), ("", 2));
 }
@@ -106,7 +106,7 @@ fn a_released_windows_title_is_dropped() {
 fn empty_zones_get_hints_and_no_header() {
     let mut state = two_columns();
     update(&mut state, Msg::WindowDropped { window: A, at: Point::new(200.0, 300.0), alt: true });
-    assert_eq!(state.empty_zones(), vec![Rect::new(402.0, 0.0, 398.0, 600.0)]);
+    assert_eq!(state.empty_zones(), vec![Rect::new(404.0, 8.0, 388.0, 584.0)]);
     assert_eq!(state.zone_headers().len(), 1);
 }
 
@@ -117,7 +117,7 @@ fn toggling_headers_moves_windows_and_saves() {
     assert!(!state.settings.show_zone_headers);
     assert!(state.zone_headers().is_empty());
     assert!(effects.iter().any(|e| matches!(e, Effect::SaveSettings(s) if !s.show_zone_headers)));
-    assert!(effects.contains(&Effect::Place { window: A, rect: Rect::new(2.0, 2.0, 394.0, 596.0) }));
+    assert!(effects.contains(&Effect::Place { window: A, rect: Rect::new(10.0, 10.0, 384.0, 580.0) }));
 }
 
 #[test]
@@ -139,7 +139,7 @@ fn active_bevel_wraps_header_and_window() {
     let mut state = with_two_windows();
     update(&mut state, Msg::ForegroundChanged(A));
     let h = state.active_highlight().expect("highlight");
-    assert_eq!(h.bevel, Rect::new(0.0, 0.0, 398.0, 600.0));
+    assert_eq!(h.bevel, Rect::new(8.0, 8.0, 388.0, 584.0));
 }
 
 #[test]

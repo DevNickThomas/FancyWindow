@@ -4,6 +4,9 @@ use crate::model::{Point, Rect, SPLITTER_THICKNESS, ZoneId};
 
 use super::{AppState, Effect};
 
+/// How far the active glow reaches into the gap around its zone (DIPs).
+const GLOW_SPREAD: f64 = 3.0;
+
 /// Gap between a hosted window and its zone outline, before the user's margin.
 const OUTLINE_BUFFER: f64 = 2.0;
 
@@ -38,7 +41,9 @@ impl AppState {
         } else {
             host_rect(bounds, self.frame.canvas, self.margin, 0.0).inflate(OUTLINE_BUFFER)
         };
-        Some(ActiveHighlight { glow: bounds, bevel })
+        // The glow spills a little into the gap around the zone, short of its neighbours.
+        let glow = visible_rect(bounds, self.frame.canvas).inflate(GLOW_SPREAD);
+        Some(ActiveHighlight { glow, bevel })
     }
 }
 
@@ -64,11 +69,15 @@ pub(super) fn foreground_changed(state: &mut AppState, window: WindowId) -> Vec<
     vec![Effect::Repaint]
 }
 
-/// The part of a zone not covered by splitters: sides next to a splitter lose half
-/// of it; sides on the canvas edge keep everything.
+/// The gap between neighbouring zones, and between zones and the canvas edge (DIPs),
+/// as in the approved mockup. The splitter's hit area sits in the middle of it.
+pub const ZONE_GAP: f64 = 8.0;
+
+/// The part of a zone that is drawn: sides next to a splitter give up half the gap,
+/// sides on the canvas edge the whole of it, so every gap is `ZONE_GAP` wide.
 pub fn visible_rect(zone: Rect, canvas: Rect) -> Rect {
-    let half = SPLITTER_THICKNESS / 2.0;
-    let inset = |at_edge: bool| if at_edge { 0.0 } else { half };
+    debug_assert!(ZONE_GAP >= SPLITTER_THICKNESS, "splitters must fit in the gap");
+    let inset = |at_edge: bool| if at_edge { ZONE_GAP } else { ZONE_GAP / 2.0 };
     let left = inset(zone.x <= canvas.x + 0.5);
     let top = inset(zone.y <= canvas.y + 0.5);
     let right = inset(zone.right() >= canvas.right() - 0.5);

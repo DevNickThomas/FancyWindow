@@ -24,19 +24,30 @@ fn drop_at(state: &mut AppState, window: WindowId, x: f64, y: f64, alt: bool) ->
 #[test]
 fn host_rect_insets_outline_on_edges_and_half_splitter_inside() {
     let canvas = Rect::new(0.0, 0.0, 800.0, 600.0);
-    // Left column: outer edges get 2, the splitter side gets 2 + 2.
+    // Left column: the visible zone gives up the full 8 DIP gap on canvas edges and half
+    // of it (4) on the splitter side; the window sits 2 inside that.
+    assert_eq!(visible_rect(Rect::new(0.0, 0.0, 400.0, 600.0), canvas), Rect::new(8.0, 8.0, 388.0, 584.0));
     let left = host_rect(Rect::new(0.0, 0.0, 400.0, 600.0), canvas, 0.0, 0.0);
-    assert_eq!(left, Rect::new(2.0, 2.0, 400.0 - 2.0 - 4.0, 600.0 - 4.0));
+    assert_eq!(left, Rect::new(10.0, 10.0, 400.0 - 10.0 - 6.0, 600.0 - 20.0));
     // Margin adds on every side.
     let with_margin = host_rect(Rect::new(0.0, 0.0, 400.0, 600.0), canvas, 10.0, 0.0);
-    assert_eq!(with_margin, Rect::new(12.0, 12.0, 400.0 - 12.0 - 14.0, 600.0 - 24.0));
+    assert_eq!(with_margin, Rect::new(20.0, 20.0, 400.0 - 20.0 - 16.0, 600.0 - 40.0));
+}
+
+#[test]
+fn every_gap_between_zones_is_zone_gap_wide() {
+    let canvas = Rect::new(0.0, 0.0, 800.0, 600.0);
+    let left = visible_rect(Rect::new(0.0, 0.0, 400.0, 600.0), canvas);
+    let right = visible_rect(Rect::new(400.0, 0.0, 400.0, 600.0), canvas);
+    assert_eq!(right.x - left.right(), ZONE_GAP);
+    assert_eq!((left.x, canvas.right() - right.right()), (ZONE_GAP, ZONE_GAP));
 }
 
 #[test]
 fn host_rect_sits_below_the_header() {
     let canvas = Rect::new(0.0, 0.0, 800.0, 600.0);
     let r = host_rect(Rect::new(0.0, 0.0, 400.0, 600.0), canvas, 0.0, 28.0);
-    assert_eq!(r, Rect::new(2.0, 30.0, 394.0, 600.0 - 28.0 - 4.0));
+    assert_eq!(r, Rect::new(10.0, 8.0 + 28.0 + 2.0, 384.0, 584.0 - 28.0 - 4.0));
 }
 
 #[test]
@@ -59,8 +70,9 @@ fn alt_drop_over_zone_hosts_window_in_that_zone() {
     let mut state = two_columns();
     let right = state.layout.leaves()[1];
     let effects = drop_at(&mut state, WIN, 700.0, 300.0, true);
-    // Right zone is canvas (400,0,400,600) -> host (404,2,394,596) -> screen +(100,50).
-    assert_eq!(effects, vec![Effect::Host { window: WIN, rect: Rect::new(504.0, 52.0, 394.0, 596.0) }, Effect::Repaint]);
+    // Right zone is canvas (400,0,400,600) -> visible (404,8,388,584) -> host (406,10,384,580)
+    // -> screen +(100,50).
+    assert_eq!(effects, vec![Effect::Host { window: WIN, rect: Rect::new(506.0, 60.0, 384.0, 580.0) }, Effect::Repaint]);
     assert_eq!(state.zone_of(WIN), Some(right));
 }
 
@@ -72,9 +84,10 @@ fn a_dropped_window_is_active_and_highlighted() {
     drop_at(&mut state, WIN, 700.0, 300.0, true);
     assert_eq!(state.active, Some(WIN));
     let h = state.active_highlight().expect("highlight");
-    // Glow covers the whole zone, splitter half included; the bevel hugs the window 2 DIPs out.
-    assert_eq!(h.glow, Rect::new(400.0, 0.0, 400.0, 600.0));
-    assert_eq!(h.bevel, Rect::new(402.0, 0.0, 398.0, 600.0));
+    // The glow reaches 3 DIP into the gap around the visible zone; the bevel hugs the window
+    // 2 DIP out (with headers off it sits exactly on the visible zone).
+    assert_eq!(h.glow, Rect::new(401.0, 5.0, 394.0, 590.0));
+    assert_eq!(h.bevel, Rect::new(404.0, 8.0, 388.0, 584.0));
 }
 
 #[test]
@@ -97,8 +110,8 @@ fn bevel_follows_the_margin() {
     drop_at(&mut state, WIN, 200.0, 300.0, true);
     state.margin = 10.0;
     let h = state.active_highlight().expect("highlight");
-    // Window at (12,12)-(386,588) with margin 10; bevel 2 DIPs outside it.
-    assert_eq!(h.bevel, Rect::new(10.0, 10.0, 378.0, 580.0));
+    // Window at (20,20)-(384,580) with margin 10; bevel 2 DIP outside it.
+    assert_eq!(h.bevel, Rect::new(18.0, 18.0, 368.0, 564.0));
 }
 
 #[test]
@@ -147,7 +160,7 @@ fn moving_a_hosted_window_snaps_it_back() {
     let mut state = two_columns();
     drop_at(&mut state, WIN, 700.0, 300.0, true);
     let effects = drop_at(&mut state, WIN, 200.0, 300.0, false);
-    assert_eq!(effects, vec![Effect::Place { window: WIN, rect: Rect::new(504.0, 52.0, 394.0, 596.0) }]);
+    assert_eq!(effects, vec![Effect::Place { window: WIN, rect: Rect::new(506.0, 60.0, 384.0, 580.0) }]);
 }
 
 #[test]
@@ -166,7 +179,7 @@ fn moving_fancy_window_moves_hosted_windows() {
     let mut state = two_columns();
     drop_at(&mut state, WIN, 700.0, 300.0, true);
     let effects = update(&mut state, Msg::FrameChanged(Frame::new(800.0, 600.0, Point::new(0.0, 0.0), 1.0)));
-    assert!(effects.contains(&Effect::Place { window: WIN, rect: Rect::new(404.0, 2.0, 394.0, 596.0) }));
+    assert!(effects.contains(&Effect::Place { window: WIN, rect: Rect::new(406.0, 10.0, 384.0, 580.0) }));
 }
 
 #[test]
@@ -175,7 +188,7 @@ fn dragging_a_splitter_moves_hosted_windows() {
     drop_at(&mut state, WIN, 700.0, 300.0, true);
     update(&mut state, Msg::MouseDown { at: Point::new(400.0, 300.0), button: Button::Left, mods: Modifiers::default() });
     let effects = update(&mut state, Msg::MouseMove { at: Point::new(500.0, 300.0), mods: Modifiers::default() });
-    assert!(effects.contains(&Effect::Place { window: WIN, rect: Rect::new(604.0, 52.0, 294.0, 596.0) }));
+    assert!(effects.contains(&Effect::Place { window: WIN, rect: Rect::new(606.0, 60.0, 284.0, 580.0) }));
 }
 
 #[test]
@@ -186,7 +199,8 @@ fn splitting_keeps_window_in_first_half() {
     let ctrl = Modifiers { ctrl: true, shift: false };
     update(&mut state, Msg::MouseDown { at: Point::new(700.0, 300.0), button: Button::Left, mods: ctrl });
     assert_eq!(state.zone_of(WIN), Some(right));
-    assert_eq!(state.host_screen_rect(right).unwrap().width, 200.0 - 4.0 - 4.0);
+    // 200 DIP between two splitters: half a gap (4) off each side, then 2 for the window.
+    assert_eq!(state.host_screen_rect(right).unwrap().width, 200.0 - 4.0 - 4.0 - 2.0 - 2.0);
 }
 
 #[test]

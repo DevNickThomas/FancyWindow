@@ -33,7 +33,7 @@ app icon is the Pane mark rather than the four-colour grid shown in its mockups.
 (Dark Modern and Light Modern) for side-by-side comparison, without opening a window.
 `cargo run --release --example perf` times the per-move and per-repaint work.
 
-Matches: one 36 DIP title row (icon, menus, 360x24 centre box with search glyph, 46 DIP
+Matches: 8 DIP gaps between zones and around the canvas (zones as rounded cards); one 36 DIP title row (icon, menus, 360x24 centre box with search glyph, 46 DIP
 caption buttons); zone headers (icon, title, mono number chip, ×; active header lifted
 with a 2 px accent line); dashed empty zones with key chips; accent status bar with
 icon-led clickable segments and the live cycle hint; palette with thumbnails and key
@@ -41,8 +41,6 @@ chips; Modern palettes; 45% / 28% active glow; Segoe UI Variable with Cascadia M
 for keys.
 
 Known differences, kept on purpose or still open:
-- Zones are separated by the 4 DIP splitter and reach the canvas edge; the mockup
-  shows 8 px gaps and an 8 px outer margin. Open.
 - The active zone's glow is a solid pre-blended tint, not the mockup's soft blur
   (GDI has no blur; the report puts a real blur with Direct2D, #12).
 - Default accent stays #007ACC (mockup: #0078D4), indistinguishable in use.

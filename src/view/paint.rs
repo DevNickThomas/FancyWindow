@@ -11,7 +11,7 @@ use super::gdi::{self, Align};
 use super::titlebar::{CaptionButton, TitleLayout, layout as title_layout};
 use super::statusbar::{StatusLayout, layout as status_layout};
 use super::{Color, Theme, canvas_top_px, theme_of, to_px};
-use crate::app::{AppState, SegmentKind, StatusBar, StatusClick, WindowId, ZoneHeader};
+use crate::app::{AppState, SegmentKind, StatusBar, StatusClick, WindowId, ZoneHeader, visible_rect};
 use crate::model::Rect;
 
 /// Zone corners, as in the mockup.
@@ -83,7 +83,7 @@ fn draw_canvas(hdc: HDC, state: &AppState, theme: &Theme, icons: &HashMap<Window
     let radius = (ZONE_RADIUS * scale).round() as i32;
     // Occupied zones are tinted; empty ones are a dashed outline on the canvas (drawn below).
     for zone in state.zone_rects().into_iter().filter(|z| state.attachments.iter().any(|a| a.zone == z.id)) {
-        gdi::rounded(hdc, to_px(zone.bounds, scale), theme.zone_fill, theme.zone_border, radius);
+        gdi::rounded(hdc, to_px(visible_rect(zone.bounds, state.frame.canvas), scale), theme.zone_fill, theme.zone_border, radius);
     }
     // Splitters are gaps, as in the mockup; only the one under the mouse or being dragged
     // shows, in the accent, like VS Code's sashes.

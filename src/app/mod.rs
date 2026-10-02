@@ -15,7 +15,7 @@ mod workspace;
 
 pub use command::Command;
 pub use hotkeys::CONFIGURABLE;
-pub use attach::{ActiveHighlight, Attachment, WindowId, host_rect, visible_rect};
+pub use attach::{ActiveHighlight, Attachment, WindowId, ZONE_GAP, host_rect, visible_rect};
 pub use headers::{HEADER_HEIGHT, HeaderHit, ZoneHeader};
 pub use frame::Frame;
 pub use menu::{MOUSE_GESTURES, Menu, MenuAction, MenuItem, PRESETS, menu_bar, zone_menu};

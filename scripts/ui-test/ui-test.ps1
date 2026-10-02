@@ -137,13 +137,14 @@ function Center($z) { @([int]($z[0] + $z[2] / 2), [int]($z[1] + $z[3] / 2)) }
 # Where a hosted window should sit: 2 + margin from canvas edges, 4 + margin next to splitters.
 # Zone headers are on by default (Layout > Hide zone headers): 28 DIP over each window.
 $HeaderHeight = 28
+# Zones keep an 8 DIP gap (app::ZONE_GAP): all of it on canvas edges, half beside a splitter.
 function HostRect($z, [double]$margin = 0) {
     $c = Canvas
     $base = 2 + $margin
-    $l = if ($z[0] -le $c[0] + 0.5) { $base } else { $base + 2 }
-    $t = $HeaderHeight + $(if ($z[1] -le $c[1] + 0.5) { $base } else { $base + 2 })
-    $r = if ($z[0] + $z[2] -ge $c[0] + $c[2] - 0.5) { $base } else { $base + 2 }
-    $b = if ($z[1] + $z[3] -ge $c[1] + $c[3] - 0.5) { $base } else { $base + 2 }
+    $l = $base + $(if ($z[0] -le $c[0] + 0.5) { 8 } else { 4 })
+    $t = $HeaderHeight + $base + $(if ($z[1] -le $c[1] + 0.5) { 8 } else { 4 })
+    $r = $base + $(if ($z[0] + $z[2] -ge $c[0] + $c[2] - 0.5) { 8 } else { 4 })
+    $b = $base + $(if ($z[1] + $z[3] -ge $c[1] + $c[3] - 0.5) { 8 } else { 4 })
     @(($z[0] + $l), ($z[1] + $t), ($z[2] - $l - $r), ($z[3] - $t - $b))
 }
 
