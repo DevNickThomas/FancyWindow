@@ -3,6 +3,7 @@
 mod attach;
 mod command;
 mod frame;
+mod headers;
 mod hotkeys;
 mod menu;
 mod msg;
@@ -13,7 +14,8 @@ mod workspace;
 
 pub use command::Command;
 pub use hotkeys::CONFIGURABLE;
-pub use attach::{ActiveHighlight, Attachment, WindowId, host_rect};
+pub use attach::{ActiveHighlight, Attachment, WindowId, host_rect, visible_rect};
+pub use headers::{HEADER_HEIGHT, HeaderHit, ZoneHeader};
 pub use frame::Frame;
 pub use menu::{MOUSE_GESTURES, Menu, MenuAction, MenuItem, PRESETS, menu_bar, zone_menu};
 pub use msg::{Button, Effect, Modifiers, Msg};

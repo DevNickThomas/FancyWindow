@@ -4,7 +4,7 @@ use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
 use std::ffi::c_void;
 
-use windows::Win32::Foundation::{HWND, RECT};
+use windows::Win32::Foundation::{HWND, LPARAM, RECT, WPARAM};
 use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance};
 use windows::Win32::UI::Shell::{ITaskbarList, TaskbarList};
 use windows::Win32::UI::WindowsAndMessaging::*;
@@ -67,6 +67,33 @@ pub fn host(anchor: HWND, window: WindowId, rect: Rect) {
     }
     raise(anchor, window);
     add_taskbar_tab(h);
+}
+
+/// The window's title as the system last saw it. Unlike GetWindowText this sends the
+/// window no message, so a hung app can't stall Fancy Window.
+pub fn title(window: WindowId) -> String {
+    let mut buffer = [0u16; 256];
+    let len = unsafe { InternalGetWindowText(hwnd(window), &mut buffer) };
+    String::from_utf16_lossy(&buffer[..len.max(0) as usize])
+}
+
+/// The window's small icon: asked of the window (giving up after 100 ms), then its class.
+/// The handle belongs to the window or its class; it is never destroyed here.
+pub fn icon(window: WindowId) -> Option<isize> {
+    const ICON_SMALL: usize = 0;
+    const ICON_BIG: usize = 1;
+    const ICON_SMALL2: usize = 2;
+    let h = hwnd(window);
+    for kind in [ICON_SMALL2, ICON_SMALL, ICON_BIG] {
+        let mut result = 0usize;
+        let answered = unsafe {
+            SendMessageTimeoutW(h, WM_GETICON, WPARAM(kind), LPARAM(0), SMTO_ABORTIFHUNG | SMTO_BLOCK, 100, Some(&mut result))
+        };
+        if answered.0 != 0 && result != 0 {
+            return Some(result as isize);
+        }
+    }
+    [GCLP_HICONSM, GCLP_HICON].into_iter().map(|i| unsafe { GetClassLongPtrW(h, i) }).find(|&v| v != 0).map(|v| v as isize)
 }
 
 /// A window started moving: remember where it was (see `MOVE_START`).

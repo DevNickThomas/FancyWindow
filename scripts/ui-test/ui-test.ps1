@@ -135,11 +135,13 @@ function ZoneRect([double]$fx, [double]$fy, [double]$fw, [double]$fh) {
 function Center($z) { @([int]($z[0] + $z[2] / 2), [int]($z[1] + $z[3] / 2)) }
 
 # Where a hosted window should sit: 2 + margin from canvas edges, 4 + margin next to splitters.
+# Zone headers are on by default (Layout > Hide zone headers): 28 DIP over each window.
+$HeaderHeight = 28
 function HostRect($z, [double]$margin = 0) {
     $c = Canvas
     $base = 2 + $margin
     $l = if ($z[0] -le $c[0] + 0.5) { $base } else { $base + 2 }
-    $t = if ($z[1] -le $c[1] + 0.5) { $base } else { $base + 2 }
+    $t = $HeaderHeight + $(if ($z[1] -le $c[1] + 0.5) { $base } else { $base + 2 })
     $r = if ($z[0] + $z[2] -ge $c[0] + $c[2] - 0.5) { $base } else { $base + 2 }
     $b = if ($z[1] + $z[3] -ge $c[1] + $c[3] - 0.5) { $base } else { $base + 2 }
     @(($z[0] + $l), ($z[1] + $t), ($z[2] - $l - $r), ($z[3] - $t - $b))
@@ -306,9 +308,9 @@ Run S08 'Clicking a hosted window shows which one is active' {
     $p = Center ([UI]::Rect($T[1])); SClick $p[0] $p[1]; Start-Sleep -Milliseconds 400
     Check 'FW Test 1 is foreground' ([UI]::GetForegroundWindow() -eq $T[1])
     Shot 'S08-active-T1'
-    # Ring pixels just outside each hosted window's top edge, mid-width.
-    $r = [UI]::Rect($T[1]); $active = [UI]::Pixel(($r[0] + $r[2] / 2), ($r[1] - 1))
-    $r2 = [UI]::Rect($T[2]); $inactive = [UI]::Pixel(($r2[0] + $r2[2] / 2), ($r2[1] - 1))
+    # Ring pixels just outside each hosted window's left edge, mid-height (the zone header sits above).
+    $r = [UI]::Rect($T[1]); $active = [UI]::Pixel(($r[0] - 1), ($r[1] + $r[3] / 2))
+    $r2 = [UI]::Rect($T[2]); $inactive = [UI]::Pixel(($r2[0] - 1), ($r2[1] + $r2[3] / 2))
     Log "  ring colours: active=$active inactive=$inactive"
     Check 'active window ring stands out from inactive ones' ($active -ne $inactive) "active $active inactive $inactive"
     # The hosted window's drop shadow darkens the outermost bevel pixel a little.

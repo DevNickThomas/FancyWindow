@@ -38,6 +38,8 @@ pub enum Msg {
     WindowDropped { window: WindowId, at: Point, alt: bool },
     /// A hosted window no longer exists.
     WindowClosed(WindowId),
+    /// A hosted window's title, read on hosting and whenever it changes.
+    TitleChanged { window: WindowId, title: String },
     /// Fancy Window became the active window.
     Activated,
     /// Some window, ours or not, became the foreground window.

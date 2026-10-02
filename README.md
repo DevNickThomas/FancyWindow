@@ -22,6 +22,8 @@ PC": choose **More info > Run anyway**. Check the download against the
 3. Drag splitters to resize; **right-click a splitter** to merge.
 4. **Ctrl+click** a zone to split it into columns, **Shift+click** for rows,
    **Ctrl+right-click** for the zone menu (split, join, remove).
+5. Each hosted window gets a header with its icon and title: click it to focus the
+   window, click **×** to let it go. **Layout > Hide zone headers** turns them off.
 
 ## Keyboard shortcuts
 

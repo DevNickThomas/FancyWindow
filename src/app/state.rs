@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::model::{GridLayout, Orientation, Point, Rect, Settings, SplitterHandle, ZoneRect};
 
 use super::{Attachment, Frame, Modifiers, WindowId};
@@ -28,6 +30,8 @@ pub struct AppState {
     pub active: Option<WindowId>,
     /// Sticky Win+Alt+PageDown: stay at the back, even after attaching windows.
     pub stay_back: bool,
+    /// Hosted windows' titles, as the platform last read them (for the zone headers).
+    pub titles: HashMap<WindowId, String>,
 }
 
 /// A splitter being dragged, and where the mouse was last time it moved.
@@ -42,6 +46,8 @@ pub enum CursorKind {
     Arrow,
     SizeWestEast,
     SizeNorthSouth,
+    /// Over a zone header's ×.
+    Hand,
 }
 
 impl AppState {
@@ -65,6 +71,7 @@ impl AppState {
             cycle: None,
             active: None,
             stay_back: false,
+            titles: HashMap::new(),
         }
     }
 
@@ -102,6 +109,7 @@ impl AppState {
         let orientation = match (self.drag, self.splitter_at(p)) {
             (Some(d), _) => d.handle.orientation,
             (None, Some(s)) => s.orientation,
+            (None, None) if matches!(self.header_at(p), Some(super::HeaderHit::Close(_))) => return CursorKind::Hand,
             (None, None) => return CursorKind::Arrow,
         };
         match orientation {

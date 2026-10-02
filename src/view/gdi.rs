@@ -1,9 +1,11 @@
 //! Thin wrappers over GDI drawing calls.
 
+use std::ffi::c_void;
 use std::sync::OnceLock;
 
 use windows::Win32::Foundation::{COLORREF, LPARAM, RECT, SIZE};
 use windows::Win32::Graphics::Gdi::*;
+use windows::Win32::UI::WindowsAndMessaging::{DI_NORMAL, DrawIconEx, HICON};
 use windows::core::{PCWSTR, w};
 
 use super::theme::Color;
@@ -60,6 +62,25 @@ pub fn rounded(hdc: HDC, r: Rect, fill: Color, border: Color, radius: i32) {
     }
 }
 
+/// A straight line `width` pixels thick.
+pub fn line(hdc: HDC, from: (i32, i32), to: (i32, i32), color: Color, width: i32) {
+    unsafe {
+        let pen = CreatePen(PS_SOLID, width, colorref(color));
+        let old_pen = SelectObject(hdc, pen.into());
+        let _ = MoveToEx(hdc, from.0, from.1, None);
+        let _ = LineTo(hdc, to.0, to.1);
+        SelectObject(hdc, old_pen);
+        let _ = DeleteObject(pen.into());
+    }
+}
+
+/// Draws an icon handle (owned by someone else) scaled to `size` pixels.
+pub fn icon(hdc: HDC, x: i32, y: i32, size: i32, handle: isize) {
+    unsafe {
+        let _ = DrawIconEx(hdc, x, y, HICON(handle as *mut c_void), size, size, 0, None, DI_NORMAL);
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum Align {
     Left,
@@ -79,7 +100,7 @@ pub fn text(hdc: HDC, r: Rect, s: &str, color: Color, px_height: i32, align: Ali
     with_font(hdc, px_height, || unsafe {
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, colorref(color));
-        DrawTextW(hdc, &mut wide, &mut rc, align | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextW(hdc, &mut wide, &mut rc, align | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
     });
 }
 

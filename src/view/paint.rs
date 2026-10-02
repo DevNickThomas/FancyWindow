@@ -1,13 +1,20 @@
+use std::collections::HashMap;
+
 use windows::Win32::Foundation::{HWND, POINT};
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::WindowsAndMessaging::GetClientRect;
 
 use super::gdi::{self, Align};
 use super::{Color, MENU_BAR_HEIGHT, STATUS_BAR_HEIGHT, Theme, canvas_top_px, theme_of, to_px};
-use crate::app::{AppState, Segment};
+use crate::app::{AppState, Segment, WindowId, ZoneHeader};
 use crate::model::Rect;
 
 const ZONE_RADIUS: f64 = 4.0;
+/// Zone headers: text size, icon size, left padding and gap between parts (DIPs).
+const HEADER_FONT: f64 = 12.0;
+const HEADER_ICON: f64 = 16.0;
+const HEADER_PADDING: f64 = 8.0;
+const HEADER_GAP: f64 = 7.0;
 /// Menu-bar titles, at VS Code's 13px UI size.
 const BAR_FONT: f64 = 13.0;
 const STATUS_FONT: f64 = 12.0;
@@ -20,8 +27,8 @@ const REMINDER_FONT: f64 = 14.0;
 const VERSION: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 
 /// Paints the whole client area, double-buffered to avoid flicker.
-/// `open_menu` is the menu-bar title to show pressed.
-pub fn paint(hwnd: HWND, state: &AppState, titles: &[&str], open_menu: Option<usize>) {
+/// `open_menu` is the menu-bar title to show pressed; `icons` are hosted windows' small icons.
+pub fn paint(hwnd: HWND, state: &AppState, titles: &[&str], open_menu: Option<usize>, icons: &HashMap<WindowId, isize>) {
     let theme = &theme_of(state);
     unsafe {
         let mut ps = PAINTSTRUCT::default();
@@ -36,7 +43,7 @@ pub fn paint(hwnd: HWND, state: &AppState, titles: &[&str], open_menu: Option<us
 
         let client = Rect::new(0.0, 0.0, w as f64, h as f64);
         gdi::fill(buffer, client, theme.window_bg);
-        draw_canvas(buffer, state, theme);
+        draw_canvas(buffer, state, theme, icons);
         draw_menu_bar(buffer, client, state.frame.scale, theme, titles, open_menu);
         draw_status_bar(buffer, client, state, theme);
 
@@ -48,8 +55,9 @@ pub fn paint(hwnd: HWND, state: &AppState, titles: &[&str], open_menu: Option<us
     }
 }
 
-/// Zones, splitters, split preview and the active-window highlight, shifted below the menu bar.
-fn draw_canvas(hdc: HDC, state: &AppState, theme: &Theme) {
+/// Zones, splitters, the active-window highlight, zone headers, empty-zone hints and
+/// the split preview, shifted below the menu bar.
+fn draw_canvas(hdc: HDC, state: &AppState, theme: &Theme, icons: &HashMap<WindowId, isize>) {
     let scale = state.frame.scale;
     let mut previous = POINT::default();
     unsafe {
@@ -63,9 +71,19 @@ fn draw_canvas(hdc: HDC, state: &AppState, theme: &Theme) {
         gdi::fill(hdc, to_px(splitter.bounds, scale), theme.splitter);
     }
     // After the splitters, so the glow spills onto the splitter halves beside the zone.
-    if let Some(active) = state.active_highlight() {
+    let active = state.active_highlight();
+    if let Some(active) = active {
         gdi::rounded(hdc, to_px(active.glow, scale), theme.active_glow, theme.active_glow, radius);
+    }
+    for header in state.zone_headers() {
+        draw_header(hdc, &header, theme, icons.get(&header.window).copied(), scale);
+    }
+    // Over the headers: the active header's top edge becomes its accent line.
+    if let Some(active) = active {
         gdi::outline(hdc, to_px(active.bevel, scale), theme.active_bevel, (HIGHLIGHT_WIDTH * scale).round() as i32, radius);
+    }
+    for zone in state.empty_zones() {
+        draw_hint(hdc, to_px(zone, scale), theme, scale);
     }
     if let Some(line) = state.split_preview() {
         gdi::fill(hdc, to_px(line, scale), theme.accent);
@@ -73,6 +91,53 @@ fn draw_canvas(hdc: HDC, state: &AppState, theme: &Theme) {
     unsafe {
         let _ = SetViewportOrgEx(hdc, previous.x, previous.y, None);
     }
+}
+
+/// Icon, title, cycle number and ×, like an editor tab. The active one is lifted to
+/// the window background with full-strength text; the rest sit on the bar colour.
+fn draw_header(hdc: HDC, header: &ZoneHeader, theme: &Theme, icon: Option<isize>, scale: f64) {
+    let px = |dip: f64| (dip * scale).round();
+    let bounds = to_px(header.bounds, scale);
+    let (background, text) = if header.active { (theme.window_bg, theme.text) } else { (theme.bar_bg, theme.muted) };
+    gdi::fill(hdc, bounds, background);
+    gdi::fill(hdc, Rect::new(bounds.x, bounds.bottom() - 1.0, bounds.width, 1.0), theme.divider);
+
+    let mut x = bounds.x + px(HEADER_PADDING);
+    if let Some(icon) = icon {
+        let size = px(HEADER_ICON);
+        gdi::icon(hdc, x as i32, (bounds.y + (bounds.height - size) / 2.0) as i32, size as i32, icon);
+        x += size + px(HEADER_GAP);
+    }
+
+    let close = to_px(header.close, scale);
+    let number = header.number.to_string();
+    let font = px(HEADER_FONT) as i32;
+    let badge_width = gdi::text_width(hdc, &number, font) as f64 + px(10.0);
+    let badge = Rect::new(close.x - px(HEADER_GAP) - badge_width, bounds.y + (bounds.height - px(16.0)) / 2.0, badge_width, px(16.0));
+    gdi::rounded(hdc, badge, theme.splitter, theme.splitter, px(3.0) as i32);
+    gdi::text(hdc, badge, &number, text, font, Align::Center);
+
+    let title = if header.title.is_empty() { "(untitled)" } else { header.title.as_str() };
+    let title_rect = Rect::new(x, bounds.y, (badge.x - px(HEADER_GAP) - x).max(0.0), bounds.height);
+    gdi::text(hdc, title_rect, title, text, font, Align::Left);
+
+    // ×: two strokes across the middle of the close box.
+    let (cx, cy, arm) = (close.x + close.width / 2.0, close.y + close.height / 2.0, px(4.0));
+    let width = px(1.2).max(1.0) as i32;
+    gdi::line(hdc, ((cx - arm) as i32, (cy - arm) as i32), ((cx + arm) as i32 + 1, (cy + arm) as i32 + 1), text, width);
+    gdi::line(hdc, ((cx - arm) as i32, (cy + arm) as i32), ((cx + arm) as i32 + 1, (cy - arm) as i32 - 1), text, width);
+}
+
+/// "Alt + drag a window here" in the middle of an empty zone, when there is room.
+fn draw_hint(hdc: HDC, zone: Rect, theme: &Theme, scale: f64) {
+    if zone.width < 230.0 * scale || zone.height < 70.0 * scale {
+        return;
+    }
+    let font = (HEADER_FONT * scale).round() as i32;
+    let line = 20.0 * scale;
+    let middle = zone.y + zone.height / 2.0;
+    gdi::text(hdc, Rect::new(zone.x, middle - line, zone.width, line), "Alt + drag a window here", theme.text, font, Align::Center);
+    gdi::text(hdc, Rect::new(zone.x, middle, zone.width, line), "Ctrl click splits \u{00B7} Shift click rows", theme.muted, font, Align::Center);
 }
 
 fn draw_menu_bar(hdc: HDC, client: Rect, scale: f64, theme: &Theme, titles: &[&str], open: Option<usize>) {

@@ -1,6 +1,7 @@
 //! The main window: creation, the message loop, and running effects.
 
 use std::cell::Cell;
+use std::collections::HashMap;
 use std::ffi::c_void;
 
 use windows::Win32::Foundation::*;
@@ -39,6 +40,8 @@ struct Shell {
     /// Menu-bar title whose popup is open, drawn pressed.
     open_menu: Option<usize>,
     settings_path: PathBuf,
+    /// Hosted windows' small icons for the zone headers (handles owned by those windows).
+    icons: HashMap<WindowId, isize>,
 }
 
 /// Creates the main window and runs the message loop until it closes.
@@ -69,6 +72,16 @@ pub fn run(state: AppState, settings_path: PathBuf) -> Result<()> {
             0,
             WINEVENT_OUTOFCONTEXT,
         );
+        // Hosted windows renaming themselves, for the zone headers.
+        let name_hook = SetWinEventHook(
+            EVENT_OBJECT_NAMECHANGE,
+            EVENT_OBJECT_NAMECHANGE,
+            None,
+            Some(on_name_change),
+            0,
+            0,
+            WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+        );
         SetTimer(Some(hwnd), PURGE_TIMER, PURGE_INTERVAL_MS, None);
         hotkeys::install(hwnd, with_shell(hwnd, |s| s.state.hotkey_bindings()));
         apply_theme(hwnd);
@@ -81,6 +94,7 @@ pub fn run(state: AppState, settings_path: PathBuf) -> Result<()> {
         }
         let _ = UnhookWinEvent(move_hook);
         let _ = UnhookWinEvent(focus_hook);
+        let _ = UnhookWinEvent(name_hook);
     }
     Ok(())
 }
@@ -100,7 +114,7 @@ unsafe fn create_window(state: AppState, settings_path: PathBuf) -> Result<HWND>
         RegisterClassW(&class);
         let (x, y, width, height) = placement::initial(state.settings.bounds());
         let title = HSTRING::from(state.title());
-        let shell = Box::new(Shell { state, tracking_leave: false, open_menu: None, settings_path });
+        let shell = Box::new(Shell { state, tracking_leave: false, open_menu: None, settings_path, icons: HashMap::new() });
         CreateWindowExW(
             WINDOW_EX_STYLE::default(),
             w!("FancyWindow"),
@@ -165,7 +179,7 @@ extern "system" fn wndproc(hwnd: HWND, message: u32, wparam: WPARAM, lparam: LPA
             WM_TIMER if wparam.0 == PURGE_TIMER => purge_closed_windows(hwnd),
             WM_PAINT => with_shell(hwnd, |s| {
                 let titles: Vec<&str> = menu_bar(&s.state).iter().map(|m| m.title).collect();
-                view::paint(hwnd, &s.state, &titles, s.open_menu);
+                view::paint(hwnd, &s.state, &titles, s.open_menu, &s.icons);
             }),
             WM_LBUTTONDOWN if (lparam.0 >> 16) as i16 as f64 <= view::canvas_top_px(scale(hwnd)) => {
                 open_bar_menu(hwnd, (lparam.0 & 0xFFFF) as i16 as f64);
@@ -214,7 +228,10 @@ fn run_effect(hwnd: HWND, effect: Effect) {
             Effect::ReleaseMouse => {
                 let _ = ReleaseCapture();
             }
-            Effect::Host { window, rect } => host::host(hwnd, window, rect),
+            Effect::Host { window, rect } => {
+                host::host(hwnd, window, rect);
+                refresh_window_info(hwnd, window);
+            }
             Effect::Place { window, rect } => host::place(hwnd, window, rect),
             Effect::Release(window) => host::release(window),
             Effect::Forget(window) => host::forget(window),
@@ -318,6 +335,33 @@ fn purge_closed_windows(hwnd: HWND) {
     for window in windows.into_iter().filter(|w| !host::is_alive(*w)) {
         dispatch(hwnd, Msg::WindowClosed(window));
     }
+    with_shell(hwnd, |s| {
+        let hosted: Vec<WindowId> = s.state.attachments.iter().map(|a| a.window).collect();
+        s.icons.retain(|w, _| hosted.contains(w));
+    });
+}
+
+/// Reads a hosted window's title and icon for its zone header.
+fn refresh_window_info(hwnd: HWND, window: WindowId) {
+    let icon = host::icon(window);
+    with_shell(hwnd, |s| match icon {
+        Some(icon) => s.icons.insert(window, icon),
+        None => s.icons.remove(&window),
+    });
+    dispatch(hwnd, Msg::TitleChanged { window, title: host::title(window) });
+}
+
+unsafe extern "system" fn on_name_change(_: HWINEVENTHOOK, _: u32, window: HWND, id_object: i32, id_child: i32, _: u32, _: u32) {
+    const CHILDID_SELF: i32 = 0;
+    if id_object != OBJID_WINDOW.0 || id_child != CHILDID_SELF || window.is_invalid() {
+        return;
+    }
+    let main = MAIN.get();
+    let id = WindowId(window.0 as isize);
+    // Every window in the system renames itself now and then; only ours matter.
+    if with_shell(main, |s| s.state.zone_of(id).is_some()) {
+        refresh_window_info(main, id);
+    }
 }
 
 unsafe extern "system" fn on_move_size(_: HWINEVENTHOOK, event: u32, window: HWND, id_object: i32, _: i32, _: u32, _: u32) {
@@ -360,6 +404,7 @@ fn set_cursor(hwnd: HWND) {
         CursorKind::Arrow => IDC_ARROW,
         CursorKind::SizeWestEast => IDC_SIZEWE,
         CursorKind::SizeNorthSouth => IDC_SIZENS,
+        CursorKind::Hand => IDC_HAND,
     };
     unsafe {
         SetCursor(LoadCursorW(None, id).ok());

@@ -5,9 +5,11 @@ const WIN: WindowId = WindowId(0x1234);
 const OTHER: WindowId = WindowId(0x5678);
 const BOUNDS: WindowBounds = WindowBounds { left: 1.0, top: 2.0, width: 3.0, height: 4.0, maximized: false };
 
-/// Two columns, canvas 800x600 DIPs, at screen (100, 50), 100% scale.
+/// Two columns, canvas 800x600 DIPs, at screen (100, 50), 100% scale. Zone headers
+/// are off here so the numbers are about attaching; tests/app_headers.rs covers them.
 fn two_columns() -> AppState {
     let mut state = AppState::new();
+    state.settings.show_zone_headers = false;
     state.layout = GridLayout::equal_columns(2);
     update(&mut state, Msg::FrameChanged(Frame::new(800.0, 600.0, Point::new(100.0, 50.0), 1.0)));
     state
@@ -23,16 +25,23 @@ fn drop_at(state: &mut AppState, window: WindowId, x: f64, y: f64, alt: bool) ->
 fn host_rect_insets_outline_on_edges_and_half_splitter_inside() {
     let canvas = Rect::new(0.0, 0.0, 800.0, 600.0);
     // Left column: outer edges get 2, the splitter side gets 2 + 2.
-    let left = host_rect(Rect::new(0.0, 0.0, 400.0, 600.0), canvas, 0.0);
+    let left = host_rect(Rect::new(0.0, 0.0, 400.0, 600.0), canvas, 0.0, 0.0);
     assert_eq!(left, Rect::new(2.0, 2.0, 400.0 - 2.0 - 4.0, 600.0 - 4.0));
     // Margin adds on every side.
-    let with_margin = host_rect(Rect::new(0.0, 0.0, 400.0, 600.0), canvas, 10.0);
+    let with_margin = host_rect(Rect::new(0.0, 0.0, 400.0, 600.0), canvas, 10.0, 0.0);
     assert_eq!(with_margin, Rect::new(12.0, 12.0, 400.0 - 12.0 - 14.0, 600.0 - 24.0));
 }
 
 #[test]
+fn host_rect_sits_below_the_header() {
+    let canvas = Rect::new(0.0, 0.0, 800.0, 600.0);
+    let r = host_rect(Rect::new(0.0, 0.0, 400.0, 600.0), canvas, 0.0, 28.0);
+    assert_eq!(r, Rect::new(2.0, 30.0, 394.0, 600.0 - 28.0 - 4.0));
+}
+
+#[test]
 fn host_rect_never_goes_negative() {
-    let r = host_rect(Rect::new(10.0, 10.0, 3.0, 3.0), Rect::new(0.0, 0.0, 800.0, 600.0), 0.0);
+    let r = host_rect(Rect::new(10.0, 10.0, 3.0, 3.0), Rect::new(0.0, 0.0, 800.0, 600.0), 0.0, 28.0);
     assert_eq!((r.width, r.height), (0.0, 0.0));
 }
 
