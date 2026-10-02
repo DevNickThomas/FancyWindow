@@ -1,0 +1,22 @@
+{
+  "windowMargin": 0,
+  "lastLayoutJson": "{\r\n  \u0022$type\u0022: \u0022split\u0022,\r\n  \u0022Id\u0022: \u00221f2e3d4c5b6a47988796a5b4c3d2e1f0\u0022,\r\n  \u0022Orientation\u0022: \u0022Columns\u0022,\r\n  \u0022Children\u0022: [\r\n    {\r\n      \u0022Node\u0022: {\r\n        \u0022$type\u0022: \u0022leaf\u0022,\r\n        \u0022Id\u0022: \u00220a0b0c0d0e0f40418283848586878889\u0022\r\n      },\r\n      \u0022Weight\u0022: 1.25\r\n    },\r\n    {\r\n      \u0022Node\u0022: {\r\n        \u0022$type\u0022: \u0022leaf\u0022,\r\n        \u0022Id\u0022: \u00229a8b7c6d5e4f40312213041526374859\u0022\r\n      },\r\n      \u0022Weight\u0022: 0.75\r\n    }\r\n  ]\r\n}",
+  "workspaces": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "themeName": "Dark",
+  "accentColor": "#A371F7",
+  "windowWidth": 1511,
+  "windowHeight": 962,
+  "windowLeft": 32,
+  "windowTop": 32,
+  "windowMaximized": false
+}
