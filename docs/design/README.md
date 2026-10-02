@@ -16,16 +16,20 @@ unless shared).
 
 | Idea | Issue | State |
 | --- | --- | --- |
-| Active-zone glow and bevel, Segoe UI Variable | — | Done |
+| Focus background tint, Segoe UI Variable | — | Done; extra bevel outline removed |
 | Live accent status bar, clickable segments | #11 | Done |
-| Zone headers (icon, title, number, ×) | #8 | Done |
+| Zone headers (icon, title, number, ×) | #8 | Optional; off by default |
+| Contextual editing over occupied panes | — | Toolbar or Ctrl+Alt+E; mouse and keyboard selection |
 | One-row title bar with caption buttons | #9 | Done |
 | Command palette | #10 | Done |
 | Activity rail, owner-drawn menus, Mica | #12 | Backlog |
 
-The report predates two decisions: default hotkeys moved from Ctrl+Win to **Win+Alt**
+The report predates these decisions: default hotkeys moved from Ctrl+Win to **Win+Alt**
 (so its "Ctrl+Win+]" and "Ctrl+Win+P" read as Win+Alt+] and Win+Alt+Space), and the
 app icon is the Pane mark rather than the four-colour grid shown in its mockups.
+Panes now omit the extra header by default and use a contextual Edit layout overlay.
+The focus cue fills the background behind the hosted app rather than drawing an
+extra bevel outline. Current application captures are in the [main README](../../README.md).
 
 ## Fidelity check against the mockups
 
@@ -34,8 +38,8 @@ app icon is the Pane mark rather than the four-colour grid shown in its mockups.
 `cargo run --release --example perf` times the per-move and per-repaint work.
 
 Matches: 8 DIP gaps between zones and around the canvas (zones as rounded cards); one 36 DIP title row (icon, menus, 360x24 centre box with search glyph, 46 DIP
-caption buttons); zone headers (icon, title, mono number chip, ×; active header lifted
-with a 2 px accent line); dashed empty zones with key chips; accent status bar with
+caption buttons); optional zone headers (icon, title, mono number chip, ×);
+dashed empty zones with key chips; accent status bar with
 icon-led clickable segments and the live cycle hint; palette with thumbnails and key
 chips; Modern palettes; 45% / 28% active glow; Segoe UI Variable with Cascadia Mono
 for keys.

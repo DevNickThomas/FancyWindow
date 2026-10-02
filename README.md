@@ -1,99 +1,196 @@
 # Fancy Window
 
-A tiny tiling host for Windows. Drop other applications' windows into
-resizable zones, save named layouts, switch between them with hotkeys.
+Arrange desktop applications inside one resizable workspace on Windows 10/11.
+Drop windows into panes, split the pane you are working in, and save layouts you
+can return to with a shortcut.
 
-![Fancy Window with a big-left, stacked-right layout](docs/screenshot.png)
+![Fancy Window running with real desktop applications](docs/screenshot.png)
 
-A single ~2.5 MB exe written in Rust, with nothing to install (Windows 10/11).
+These screenshots and controls show **2.1.0-preview.1 on main**. The latest packaged
+release is [2.0.0](https://github.com/DevNickThomas/FancyWindow/releases/tag/v2.0.0),
+which predates this interface. Build main to try the preview.
 
-## Install
+## Get started
 
-Download the zip from Releases, unzip anywhere and run `FancyWindow.exe`. The exe
-is not code-signed, so the first time Windows may say "Windows protected your
-PC": choose **More info > Run anyway**. Check the download against the
-`.sha256` file if you like.
+Download a zip from [Releases](https://github.com/DevNickThomas/FancyWindow/releases),
+extract it to a writable folder, and run `FancyWindow.exe`. It is a portable Rust
+application, with settings stored alongside the executable.
 
-## Quick start
+1. Choose **Two side-by-side** or **2×2 grid** from **Layout**.
+2. Hold **Alt** while dragging an application's title bar into a pane. Release the
+   mouse while Alt is still held. The window fits that pane.
+3. Drag the gaps between panes to resize them.
+4. To release a hosted window, **Alt+drag** its title bar to the place you want it.
+   A normal drag keeps it attached and returns it to its pane.
+5. Closing Fancy Window releases hosted windows without closing their apps.
 
-1. Run `FancyWindow.exe` (or `FancyWindow.exe --profile work` for a separate
-   copy with its own `settings-work.json`).
-2. **Alt+drag** any window into a zone. Drag it out with Alt to let it go.
-3. Drag splitters to resize; **right-click a splitter** to merge.
-4. Choose **Edit layout** in the toolbar, or press **Ctrl+Alt+E**. The last-used
-   hosted app's pane is selected. Click another pane or use **arrows / Tab / Shift+Tab**
-   to change the target. **V** splits into columns, **H** into rows, and **J** opens
-   split/join options. **Esc** or **Enter** finishes and returns focus to the selected
-   app. Changes apply immediately. The temporary overlay works over occupied panes.
-5. Panes have no extra title header by default. **Layout > Show zone headers** can
-   enable the optional title/focus/release controls; existing saved preferences are
-   respected. **Ctrl+click**, **Shift+click**, and **Ctrl+right-click** still work on
-   exposed zone surfaces for splitting and opening the zone menu.
+The executable is currently unsigned. Windows may show a SmartScreen warning or
+block it with Smart App Control. Release signing is tracked in
+[#6](https://github.com/DevNickThomas/FancyWindow/issues/6).
+
+## Split an occupied pane
+
+You do not need to find an exposed patch of background around the hosted app.
+
+1. Use the app you want to split, then choose **Edit layout** in the toolbar or
+   press **Ctrl+Alt+E**. Its pane is selected automatically.
+2. Click another pane, use the **arrow keys**, or use **Tab / Shift+Tab** to change
+   the target. A tinted background and the pane's app name identify it.
+3. Press **V** for side-by-side columns or **H** for stacked rows. Repeat inside
+   an existing split to build a nested layout.
+4. Press **J** or right-click the selected pane for split and join options.
+   Joins are available where there is a compatible neighbouring pane.
+5. Press **Enter**, **Esc**, or **Ctrl+Alt+E** again to finish and return focus to
+   the selected app. Changes apply immediately; Esc does not undo them.
+
+![Selecting and splitting an occupied pane in Edit layout](docs/screenshots/edit-layout.png)
+
+<details>
+<summary>Watch the layout-editing demonstration</summary>
+
+![Real Fancy Window captures showing contextual selection and nested splitting](docs/layout-demo.gif)
+
+A short sequence of captures from the running preview. The static screenshot
+above shows the same controls without animation.
+
+</details>
+
+Panes have **no extra Fancy Window header by default**. The hosted application's
+own title bar remains. **Layout > Show zone headers** enables optional titles,
+focus controls and release buttons; existing saved preferences are respected.
+
+On exposed pane backgrounds, **Ctrl+click** splits into columns, **Shift+click**
+splits into rows, and **Ctrl+right-click** opens the pane menu. **Right-click a
+splitter** to merge the panes beside it.
+
+## Focus, themes and colours
+
+Click a hosted app to use it, or cycle between apps with **Win+Alt+] / Win+Alt+[**.
+The focused pane gets a stronger background tint, allowing the app to retain its
+native corners without an extra focus outline.
+
+Open **File > Preferences** to choose one of ten themes, an accent swatch, or a
+custom `#RRGGBB` colour. The accent controls the focus tint and status bar. Changes
+apply immediately. Each hosted app keeps its own theme.
+
+![Light Modern theme with a different focus accent](docs/screenshots/light-theme.png)
+
+<details>
+<summary>Theme and accent preferences</summary>
+
+![Preferences showing theme presets, accent swatches and a custom colour field](docs/screenshots/preferences.png)
+
+</details>
+
+## Workspaces and command palette
+
+Use **Workspaces > Save current as** to name a layout. Pick its name in that menu
+to load it, or use **Workspaces > Set hotkey** to assign a shortcut. Workspaces save
+pane arrangements, not application sessions: they do not launch apps or restore
+documents. Loading a layout moves already hosted windows into its panes in reading
+order; windows that no longer fit are released.
+
+Click the search box in the title bar, choose **File > Command palette**, or press
+**Win+Alt+Space**. Type to filter layouts, saved workspaces and commands, use the
+arrow keys to select, then press **Enter**. **Esc** closes the palette.
+
+![Command palette in the current preview](docs/screenshots/command-palette.png)
+
+The status bar is interactive:
+
+| Click | Result |
+| --- | --- |
+| Workspace/profile name | Open Workspaces |
+| Zone/window count | Open Layout |
+| Margin | Increase by 2; right-click to decrease |
+| Held at the back | Bring the host forward |
+| **?** | Open keyboard shortcuts |
+
+**Layout > 2×2 grid** keeps hosted apps when applying that preset. **Reset to 2×2**
+currently releases all hosted windows as well as resetting the layout.
 
 ## Keyboard shortcuts
 
-Defaults below. Every hotkey can be changed or cleared in **File > Keyboard
-shortcuts** (also under Help, and the **?** in the status bar): press **Change**,
-then try key combinations. Each one is checked as you press it: **Available**,
-**Already used for** another command, or **In use by another application**
-(Windows would never deliver it). Only an available chord can be saved.
-
-| Chord | Action |
+| Default chord | Action |
 | --- | --- |
-| `Ctrl+Alt+E` | Edit layout, starting from the last-used hosted app |
-| `Win+Alt+PageDown` | Send Fancy Window behind everything (stays back while you attach) |
-| `Win+Alt+PageUp` | Bring it forward and leave stay-back |
-| `Win+Alt+]` / `[` | Focus the next / previous hosted window, across instances |
-| `Win+Alt+=` / `-` | Increase / decrease the hosted-window margin |
-| `Win+Alt+Home` | Reset to a 2x2 grid |
-| `Win+Alt+Space` | Command palette: every layout, workspace and command, filtered as you type (also **File > Command palette**, or click the box in the title bar) |
+| **Ctrl+Alt+E** | Open/finish contextual layout editing |
+| **Win+Alt+] / Win+Alt+[** | Focus next/previous hosted window, across instances |
+| **Win+Alt+PageDown** | Send Fancy Window behind other windows and keep it there |
+| **Win+Alt+PageUp** | Bring Fancy Window forward |
+| **Win+Alt+= / Win+Alt+-** | Increase/decrease the hosted-window margin |
+| **Win+Alt+Home** | Reset to 2×2 and release hosted windows |
+| **Win+Alt+Space** | Open the command palette |
 
-Defaults avoid `Ctrl+Win`, which many other tools use. `Win+Alt+B` and `Win+Alt+R`
-belong to Windows (HDR toggle, Game Bar recording), hence PageUp/PageDown and Home.
+In **File > Keyboard shortcuts**, choose **Change** beside a command and press a
+chord. The dialog reports whether it is available, already assigned, or held by
+another application. Only an available chord can be saved. **Clear** removes a
+binding; **Reset to defaults** restores the command shortcuts. Custom bindings
+are retained between launches.
 
-Workspace hotkeys are set under **Workspaces > Set hotkey**. Changed hotkeys are
-saved in `settings.json` under `hotkeys`.
+## Profiles and settings
 
-## Files
+Run `FancyWindow.exe --profile work` for a separate set of saved layouts and
+preferences. Multiple instances can have different profiles.
 
-Next to the executable: `settings.json` (+ `.bak`), and `crash.log` if it ever
-panics. Profiles use `settings-<name>.json` and `crash-<name>.log`.
+| File beside the executable | Purpose |
+| --- | --- |
+| `settings.json` and `settings.json.bak` | Default profile and backup |
+| `settings-work.json` | Settings for the `work` profile |
+| `crash.log` / `crash-work.log` | Diagnostic log if that instance panics |
 
-## Design: Model-View-Update
+**File > Open settings folder** opens this location in File Explorer.
 
-Every action takes the same one-way path:
+## Build the preview
 
-```
-Win32 event -> Msg -> update(state, msg) -> effects -> repaint
-```
+Install Rust with the `x86_64-pc-windows-gnu` toolchain and MinGW-w64. Put MinGW's
+`bin` directory on `PATH` at a location **without spaces**, such as
+`C:\mingw64\bin` (gcc and windres do not handle spaced paths reliably).
 
-| Folder | Role | Win32? |
-| --- | --- | --- |
-| `src/model/` | Layout tree, geometry, settings, hotkey chords | No |
-| `src/app/` | `AppState`, `Msg`, `update()`, menus as data | No |
-| `src/view/` | Themes and painting | GDI only |
-| `src/platform/` | Window, hosting, hotkeys, dialogs, files | Yes |
-
-`model` and `app` are pure and unit tested. To follow any feature, find its
-`Msg` in `app/msg.rs` and read its arm in `app/update.rs`.
-
-## Build
-
-Needs Rust (`x86_64-pc-windows-gnu`) and MinGW-w64 on `PATH` at a folder
-**without spaces** (e.g. `C:\mingw64\bin`): gcc and windres break on spaced paths.
-
-```
-cargo test
-cargo build --release      # target\release\fancy-window.exe
-.\scripts\package.ps1      # dist\FancyWindow-<version>-win64.zip + .sha256
+```powershell
+cargo test --locked
+cargo build --release --locked
+.\target\release\fancy-window.exe --profile preview
+# Package after closing the preview:
+.\scripts\package.ps1
 ```
 
-After changing dependencies, run `scripts/third-party-notices.sh` to refresh
-`THIRD-PARTY-NOTICES.txt`, which ships in the zip.
+Packaging writes a zip and `.sha256` to `dist`. After changing dependencies, run
+`scripts/third-party-notices.sh` to refresh `THIRD-PARTY-NOTICES.txt`.
 
-`scripts\test-windows.ps1` opens throwaway windows for trying Alt+drag safely, and
-`scripts\ui-test\` runs the user stories end to end against them (see its README).
+`scripts\test-windows.ps1` opens disposable windows for testing Alt+drag.
+`scripts\ui-test\` contains the UI stories and their run instructions.
+[GitHub Issues](https://github.com/DevNickThomas/FancyWindow/issues) tracks bugs
+and remaining UX work. [Media notes](docs/screenshots/README.md) describe these
+screenshots and the animation.
+
+## Current compatibility notes
+
+The preview has been exercised with Notepad, File Explorer, Calculator and
+Character Map. Occupied nested splits, contextual selection, joins and theme changes
+work with Notepad and Explorer. Calculator displayed a blank pane while hosted,
+and some native windows showed clipping or stale frame strips after resizing.
+These findings remain open; see the [QA record](docs/qa/2026-10-02.md) and
+[issue #7](https://github.com/DevNickThomas/FancyWindow/issues/7).
+
+Allow enough room for each application's native controls. The exact Alt+drag
+gesture, default Windows-key shortcuts and mixed-DPI behaviour still need the
+manual checks listed in the QA record.
+
+## Architecture
+
+Each action follows `Win32 event → Msg → update(state, msg) → effects → repaint`.
+
+| Folder | Responsibility |
+| --- | --- |
+| `src/model/` | Layout tree, geometry, settings and shortcut chords |
+| `src/app/` | Application state, messages, updates and menus |
+| `src/view/` | Themes and GDI painting |
+| `src/platform/` | Windows hosting, input, dialogs and persistence |
+
+The model and app layers are pure and unit tested. The
+[design notes](docs/design/README.md) preserve the original mockups and later decisions.
 
 ## Licence
 
-MIT, see `LICENSE`. Third-party licences are in `THIRD-PARTY-NOTICES.txt`.
+MIT: see [LICENSE](LICENSE). Dependency licences are in
+[THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
