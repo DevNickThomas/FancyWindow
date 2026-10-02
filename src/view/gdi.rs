@@ -141,15 +141,38 @@ fn font_installed(face: &str) -> bool {
 
 /// Runs `f` with the UI font at `px_height` selected into the DC.
 fn with_font(hdc: HDC, px_height: i32, f: impl FnOnce()) {
+    with_face(hdc, px_height, ui_face(), f)
+}
+
+/// Runs `f` with `face` at `px_height` selected into the DC.
+fn with_face(hdc: HDC, px_height: i32, face: PCWSTR, f: impl FnOnce()) {
     unsafe {
         let font = CreateFontW(
             -px_height, 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0,
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-            0, ui_face(),
+            0, face,
         );
         let old_font = SelectObject(hdc, font.into());
         f();
         SelectObject(hdc, old_font);
         let _ = DeleteObject(font.into());
     }
+}
+
+/// The symbol font for caption-button glyphs: Segoe Fluent Icons (Windows 11), else
+/// Segoe MDL2 Assets (Windows 10). Both use the same code points.
+fn icon_face() -> PCWSTR {
+    static FLUENT: OnceLock<bool> = OnceLock::new();
+    if *FLUENT.get_or_init(|| font_installed("Segoe Fluent Icons")) { w!("Segoe Fluent Icons") } else { w!("Segoe MDL2 Assets") }
+}
+
+/// One symbol-font glyph centred in `r`.
+pub fn glyph(hdc: HDC, r: Rect, glyph: char, color: Color, px_height: i32) {
+    let mut wide: Vec<u16> = glyph.to_string().encode_utf16().collect();
+    let mut rc = to_rect(r);
+    with_face(hdc, px_height, icon_face(), || unsafe {
+        SetBkMode(hdc, TRANSPARENT);
+        SetTextColor(hdc, colorref(color));
+        DrawTextW(hdc, &mut wide, &mut rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    });
 }

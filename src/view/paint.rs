@@ -1,11 +1,15 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 use windows::Win32::Foundation::{HWND, POINT};
 use windows::Win32::Graphics::Gdi::*;
-use windows::Win32::UI::WindowsAndMessaging::GetClientRect;
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::WindowsAndMessaging::{GetClientRect, IMAGE_ICON, LR_DEFAULTCOLOR, LoadImageW};
+use windows::core::PCWSTR;
 
 use super::gdi::{self, Align};
-use super::{Color, MENU_BAR_HEIGHT, STATUS_BAR_HEIGHT, Theme, canvas_top_px, theme_of, to_px};
+use super::titlebar::{CaptionButton, TitleLayout, layout as title_layout};
+use super::{Color, STATUS_BAR_HEIGHT, Theme, canvas_top_px, theme_of, to_px};
 use crate::app::{AppState, Segment, WindowId, ZoneHeader};
 use crate::model::Rect;
 
@@ -21,14 +25,15 @@ const STATUS_FONT: f64 = 12.0;
 const STATUS_PADDING: f64 = 10.0;
 /// Space either side of each status-bar segment's text.
 const SEGMENT_PADDING: f64 = 9.0;
-const MENU_TITLE_PADDING: f64 = 9.0;
+/// Caption-button glyph size, as Windows draws them.
+const CAPTION_GLYPH: f64 = 10.0;
 const HIGHLIGHT_WIDTH: f64 = 2.0;
 const REMINDER_FONT: f64 = 14.0;
 const VERSION: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 
 /// Paints the whole client area, double-buffered to avoid flicker.
-/// `open_menu` is the menu-bar title to show pressed; `icons` are hosted windows' small icons.
-pub fn paint(hwnd: HWND, state: &AppState, titles: &[&str], open_menu: Option<usize>, icons: &HashMap<WindowId, isize>) {
+/// `chrome` is the title bar's window state; `icons` are hosted windows' small icons.
+pub fn paint(hwnd: HWND, state: &AppState, titles: &[&str], chrome: &TitleChrome, icons: &HashMap<WindowId, isize>) {
     let theme = &theme_of(state);
     unsafe {
         let mut ps = PAINTSTRUCT::default();
@@ -44,7 +49,7 @@ pub fn paint(hwnd: HWND, state: &AppState, titles: &[&str], open_menu: Option<us
         let client = Rect::new(0.0, 0.0, w as f64, h as f64);
         gdi::fill(buffer, client, theme.window_bg);
         draw_canvas(buffer, state, theme, icons);
-        draw_menu_bar(buffer, client, state.frame.scale, theme, titles, open_menu);
+        draw_title_bar(buffer, client, state, theme, titles, chrome);
         draw_status_bar(buffer, client, state, theme);
 
         let _ = BitBlt(hdc, 0, 0, w, h, Some(buffer), 0, 0, SRCCOPY);
@@ -140,43 +145,103 @@ fn draw_hint(hdc: HDC, zone: Rect, theme: &Theme, scale: f64) {
     gdi::text(hdc, Rect::new(zone.x, middle, zone.width, line), "Ctrl click splits \u{00B7} Shift click rows", theme.muted, font, Align::Center);
 }
 
-fn draw_menu_bar(hdc: HDC, client: Rect, scale: f64, theme: &Theme, titles: &[&str], open: Option<usize>) {
-    let bar = Rect::new(0.0, 0.0, client.width, MENU_BAR_HEIGHT * scale);
-    gdi::fill(hdc, bar, theme.bar_bg);
-    let font = (BAR_FONT * scale).round() as i32;
-    for (i, (title, rect)) in titles.iter().zip(title_rects(hdc, titles, scale)).enumerate() {
-        let pressed = open == Some(i);
-        if pressed {
-            gdi::fill(hdc, rect, theme.active_bg);
-        }
-        let color = if pressed { theme.active_text } else { theme.text };
-        gdi::text(hdc, rect, title, color, font, Align::Center);
-    }
+/// Title-bar state only the platform knows: which menu is open, whether the window is
+/// active or maximised, and which caption button the mouse is over or pressing.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TitleChrome {
+    pub open_menu: Option<usize>,
+    pub active: bool,
+    pub maximized: bool,
+    pub hover: Option<CaptionButton>,
+    pub pressed: Option<CaptionButton>,
 }
 
-/// Where each menu-bar title sits, in client pixels.
-pub fn menu_title_rects(hwnd: HWND, titles: &[&str], scale: f64) -> Vec<Rect> {
+/// The title bar's layout for a client area `width` pixels wide, measuring the menu titles.
+pub fn measure_title_bar(hwnd: HWND, titles: &[&str], width: f64, scale: f64) -> TitleLayout {
     unsafe {
         let hdc = GetDC(Some(hwnd));
-        let rects = title_rects(hdc, titles, scale);
+        let layout = title_layout_in(hdc, titles, width, scale);
         ReleaseDC(Some(hwnd), hdc);
-        rects
+        layout
     }
 }
 
-fn title_rects(hdc: HDC, titles: &[&str], scale: f64) -> Vec<Rect> {
+fn title_layout_in(hdc: HDC, titles: &[&str], width: f64, scale: f64) -> TitleLayout {
     let font = (BAR_FONT * scale).round() as i32;
-    let pad = MENU_TITLE_PADDING * scale;
-    let mut x = (STATUS_PADDING * scale) / 2.0;
-    titles
-        .iter()
-        .map(|t| {
-            let width = gdi::text_width(hdc, t, font) as f64 + 2.0 * pad;
-            let rect = Rect::new(x, 0.0, width, MENU_BAR_HEIGHT * scale);
-            x += width;
-            rect
-        })
-        .collect()
+    let widths: Vec<f64> = titles.iter().map(|t| gdi::text_width(hdc, t, font) as f64).collect();
+    title_layout(width, scale, &widths)
+}
+
+/// Icon, menus, the centre box with the window and workspace name, and caption buttons.
+/// An inactive window's title bar is muted, as Windows does.
+fn draw_title_bar(hdc: HDC, client: Rect, state: &AppState, theme: &Theme, titles: &[&str], chrome: &TitleChrome) {
+    let scale = state.frame.scale;
+    let layout = title_layout_in(hdc, titles, client.width, scale);
+    let text = if chrome.active { theme.text } else { theme.muted };
+    gdi::fill(hdc, layout.bar, theme.bar_bg);
+    gdi::fill(hdc, Rect::new(0.0, layout.bar.bottom() - 1.0, client.width, 1.0), theme.divider);
+
+    if let Some(icon) = app_icon(layout.icon.width as i32) {
+        gdi::icon(hdc, layout.icon.x as i32, layout.icon.y as i32, layout.icon.width as i32, icon);
+    }
+
+    let font = (BAR_FONT * scale).round() as i32;
+    for (i, (title, rect)) in titles.iter().zip(&layout.menus).enumerate() {
+        let open = chrome.open_menu == Some(i);
+        if open {
+            gdi::fill(hdc, *rect, theme.active_bg);
+        }
+        gdi::text(hdc, *rect, title, if open { theme.active_text } else { text }, font, Align::Center);
+    }
+
+    if let Some(centre) = layout.centre {
+        let workspace = state.current_workspace().and_then(|slot| state.workspace(slot)).and_then(|ws| ws.name.clone());
+        let label = match workspace {
+            Some(name) => format!("{} \u{2014} {name}", state.title()),
+            None => state.title(),
+        };
+        gdi::rounded(hdc, centre, theme.window_bg, theme.divider, (6.0 * scale).round() as i32);
+        gdi::text(hdc, centre, &label, theme.muted, (STATUS_FONT * scale).round() as i32, Align::Center);
+    }
+
+    let glyph_size = (CAPTION_GLYPH * scale).round() as i32;
+    for (button, rect) in layout.buttons {
+        let close = button == CaptionButton::Close;
+        let background = match (chrome.pressed == Some(button), chrome.hover == Some(button), close) {
+            (true, _, true) => Some(Color(0xB2, 0x27, 0x1A)),
+            (_, true, true) => Some(Color(0xC4, 0x2B, 0x1C)),
+            (true, _, false) => Some(theme.text.over(theme.bar_bg, 0.18)),
+            (_, true, false) => Some(theme.text.over(theme.bar_bg, 0.10)),
+            _ => None,
+        };
+        if let Some(background) = background {
+            gdi::fill(hdc, rect, background);
+        }
+        let glyph = match button {
+            CaptionButton::Minimize => '\u{E921}',
+            CaptionButton::Maximize if chrome.maximized => '\u{E923}',
+            CaptionButton::Maximize => '\u{E922}',
+            CaptionButton::Close => '\u{E8BB}',
+        };
+        let color = if close && background.is_some() { Color(0xFF, 0xFF, 0xFF) } else { text };
+        gdi::glyph(hdc, rect, glyph, color, glyph_size);
+    }
+}
+
+/// Our own icon at exactly `size` pixels, picked from the .ico's sizes so it stays crisp.
+fn app_icon(size: i32) -> Option<isize> {
+    thread_local! {
+        static ICONS: RefCell<HashMap<i32, isize>> = RefCell::new(HashMap::new());
+    }
+    if let Some(icon) = ICONS.with_borrow(|i| i.get(&size).copied()) {
+        return Some(icon);
+    }
+    let icon = unsafe {
+        let module = GetModuleHandleW(None).ok()?;
+        LoadImageW(Some(module.into()), PCWSTR(std::ptr::without_provenance(1)), IMAGE_ICON, size, size, LR_DEFAULTCOLOR).ok()?
+    };
+    ICONS.with_borrow_mut(|i| i.insert(size, icon.0 as isize));
+    Some(icon.0 as isize)
 }
 
 /// Accent-coloured bar: state segments from the left; hint, "?" and version on the right.

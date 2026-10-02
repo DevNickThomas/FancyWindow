@@ -23,7 +23,7 @@ use super::shortcuts::{self, Request, Row, Status};
 use super::{chrome, dialogs, host, hotkeys, indicator, input, menus, placement, storage};
 use crate::app::{AppState, CONFIGURABLE, Command, CursorKind, Effect, Frame, MenuAction, Msg, WindowId, menu_bar, update, zone_menu};
 use crate::model::{Chord, Point, Rect, Settings, ZoneId, crash_log_name};
-use crate::view::{self, Theme, theme_of};
+use crate::view::{self, CaptionButton, Theme, TitleChrome, TitleHit, theme_of};
 
 const PURGE_TIMER: usize = 1;
 const PURGE_INTERVAL_MS: u32 = 2000;
@@ -37,8 +37,10 @@ thread_local! {
 struct Shell {
     state: AppState,
     tracking_leave: bool,
-    /// Menu-bar title whose popup is open, drawn pressed.
-    open_menu: Option<usize>,
+    /// Whether WM_NCMOUSELEAVE is requested (for caption-button hover).
+    tracking_nc_leave: bool,
+    /// Open menu, active state and caption-button hover for the title bar.
+    chrome: TitleChrome,
     settings_path: PathBuf,
     /// Hosted windows' small icons for the zone headers (handles owned by those windows).
     icons: HashMap<WindowId, isize>,
@@ -52,6 +54,8 @@ pub fn run(state: AppState, settings_path: PathBuf) -> Result<()> {
         let maximized = state.settings.window_maximized;
         let hwnd = create_window(state, settings_path)?;
         MAIN.set(hwnd);
+        // Re-run WM_NCCALCSIZE now that the shell is attached, so the caption goes at once.
+        let _ = SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
         // Fires when any other process's window starts and finishes a move: the Alt+drag drop.
         let move_hook = SetWinEventHook(
             EVENT_SYSTEM_MOVESIZESTART,
@@ -114,7 +118,7 @@ unsafe fn create_window(state: AppState, settings_path: PathBuf) -> Result<HWND>
         RegisterClassW(&class);
         let (x, y, width, height) = placement::initial(state.settings.bounds());
         let title = HSTRING::from(state.title());
-        let shell = Box::new(Shell { state, tracking_leave: false, open_menu: None, settings_path, icons: HashMap::new() });
+        let shell = Box::new(Shell { state, tracking_leave: false, tracking_nc_leave: false, chrome: TitleChrome::default(), settings_path, icons: HashMap::new() });
         CreateWindowExW(
             WINDOW_EX_STYLE::default(),
             w!("FancyWindow"),
@@ -171,15 +175,54 @@ extern "system" fn wndproc(hwnd: HWND, message: u32, wparam: WPARAM, lparam: LPA
                 dispatch(hwnd, Msg::FrameChanged(frame(hwnd)));
             }
             WM_ACTIVATE => {
-                if (wparam.0 & 0xFFFF) as u32 != WA_INACTIVE {
+                let active = (wparam.0 & 0xFFFF) as u32 != WA_INACTIVE;
+                with_shell(hwnd, |s| s.chrome.active = active);
+                let _ = InvalidateRect(Some(hwnd), None, false);
+                if active {
                     dispatch(hwnd, Msg::Activated);
                 }
                 return DefWindowProcW(hwnd, message, wparam, lparam);
             }
             WM_TIMER if wparam.0 == PURGE_TIMER => purge_closed_windows(hwnd),
+            // Our own title bar replaces the caption; see view::titlebar.
+            WM_NCCALCSIZE if wparam.0 != 0 => {
+                remove_caption(hwnd, wparam, lparam);
+                return LRESULT(0);
+            }
+            WM_NCHITTEST => return nc_hit_test(hwnd, wparam, lparam),
+            // lparam -1: don't repaint the (now hidden) native caption on activation.
+            WM_NCACTIVATE => return DefWindowProcW(hwnd, message, wparam, LPARAM(-1)),
+            WM_NCMOUSEMOVE => {
+                let over = caption_button(wparam);
+                set_caption_hover(hwnd, over);
+                if over.is_some() {
+                    return LRESULT(0);
+                }
+                return DefWindowProcW(hwnd, message, wparam, lparam);
+            }
+            WM_NCMOUSELEAVE => {
+                with_shell(hwnd, |s| {
+                    s.tracking_nc_leave = false;
+                    s.chrome.pressed = None;
+                });
+                set_caption_hover(hwnd, None);
+            }
+            // Caption buttons are ours: let DefWindowProc near them and it draws classic ones.
+            WM_NCLBUTTONDOWN if caption_button(wparam).is_some() => {
+                with_shell(hwnd, |s| s.chrome.pressed = caption_button(wparam));
+                let _ = InvalidateRect(Some(hwnd), None, false);
+            }
+            WM_NCLBUTTONUP if caption_button(wparam).is_some() => {
+                let pressed = with_shell(hwnd, |s| s.chrome.pressed.take());
+                let _ = InvalidateRect(Some(hwnd), None, false);
+                if pressed == caption_button(wparam) {
+                    press_caption_button(hwnd, pressed);
+                }
+            }
             WM_PAINT => with_shell(hwnd, |s| {
                 let titles: Vec<&str> = menu_bar(&s.state).iter().map(|m| m.title).collect();
-                view::paint(hwnd, &s.state, &titles, s.open_menu, &s.icons);
+                let chrome = TitleChrome { maximized: IsZoomed(hwnd).as_bool(), ..s.chrome };
+                view::paint(hwnd, &s.state, &titles, &chrome, &s.icons);
             }),
             WM_LBUTTONDOWN if (lparam.0 >> 16) as i16 as f64 <= view::canvas_top_px(scale(hwnd)) => {
                 open_bar_menu(hwnd, (lparam.0 & 0xFFFF) as i16 as f64);
@@ -423,22 +466,123 @@ fn track_mouse_leave(hwnd: HWND) {
 }
 
 
-/// Opens the menu-bar popup under client x (pixels), if a title is there.
-fn open_bar_menu(hwnd: HWND, x: f64) {
+/// The title bar's layout for the current client width.
+fn title_layout(hwnd: HWND) -> view::TitleLayout {
     let (menus, scale) = with_shell(hwnd, |s| (menu_bar(&s.state), s.state.frame.scale));
     let titles: Vec<&str> = menus.iter().map(|m| m.title).collect();
-    let rects = view::menu_title_rects(hwnd, &titles, scale);
+    let mut client = RECT::default();
+    unsafe {
+        let _ = GetClientRect(hwnd, &mut client);
+    }
+    view::measure_title_bar(hwnd, &titles, client.right as f64, scale)
+}
+
+/// Height of the sizing frame at this window's DPI: the top resize strip, and how far a
+/// maximised window hangs off the screen.
+fn frame_thickness(hwnd: HWND) -> i32 {
+    unsafe {
+        let dpi = GetDpiForWindow(hwnd);
+        GetSystemMetricsForDpi(SM_CYFRAME, dpi) + GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi)
+    }
+}
+
+/// WM_NCCALCSIZE: keep the default side and bottom frame (resize borders, shadow,
+/// rounded corners) but give the caption to the client area.
+fn remove_caption(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) {
+    unsafe {
+        let params = &mut *(lparam.0 as *mut NCCALCSIZE_PARAMS);
+        let top = params.rgrc[0].top;
+        DefWindowProcW(hwnd, WM_NCCALCSIZE, wparam, lparam);
+        params.rgrc[0].top = top;
+        // A maximised window hangs off the screen by its frame; keep the title bar on it.
+        if IsZoomed(hwnd).as_bool() {
+            params.rgrc[0].top += frame_thickness(hwnd);
+        }
+    }
+}
+
+/// WM_NCHITTEST: Windows still answers for the side and bottom borders; the title bar
+/// is ours. Answering HTMAXBUTTON is what brings up Windows 11's Snap Layouts.
+fn nc_hit_test(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    let default = unsafe { DefWindowProcW(hwnd, WM_NCHITTEST, wparam, lparam) };
+    if default.0 != HTCLIENT as isize {
+        return default;
+    }
+    let mut p = POINT { x: (lparam.0 & 0xFFFF) as i16 as i32, y: ((lparam.0 >> 16) & 0xFFFF) as i16 as i32 };
+    unsafe {
+        let _ = ScreenToClient(hwnd, &mut p);
+    }
+    let maximized = unsafe { IsZoomed(hwnd).as_bool() };
+    let hit = title_layout(hwnd).hit(Point::new(p.x as f64, p.y as f64), frame_thickness(hwnd) as f64, maximized);
+    let code = match hit {
+        None | Some(TitleHit::Menu(_)) => HTCLIENT,
+        Some(TitleHit::SystemMenu) => HTSYSMENU,
+        Some(TitleHit::Caption) => HTCAPTION,
+        Some(TitleHit::Button(CaptionButton::Minimize)) => HTMINBUTTON,
+        Some(TitleHit::Button(CaptionButton::Maximize)) => HTMAXBUTTON,
+        Some(TitleHit::Button(CaptionButton::Close)) => HTCLOSE,
+        Some(TitleHit::ResizeTop) => HTTOP,
+        Some(TitleHit::ResizeTopLeft) => HTTOPLEFT,
+        Some(TitleHit::ResizeTopRight) => HTTOPRIGHT,
+    };
+    LRESULT(code as isize)
+}
+
+/// The caption button a non-client hit-test code names.
+fn caption_button(wparam: WPARAM) -> Option<CaptionButton> {
+    match wparam.0 as u32 {
+        HTMINBUTTON => Some(CaptionButton::Minimize),
+        HTMAXBUTTON => Some(CaptionButton::Maximize),
+        HTCLOSE => Some(CaptionButton::Close),
+        _ => None,
+    }
+}
+
+fn set_caption_hover(hwnd: HWND, over: Option<CaptionButton>) {
+    if with_shell(hwnd, |s| std::mem::replace(&mut s.chrome.hover, over)) == over {
+        return;
+    }
+    if over.is_some() && !with_shell(hwnd, |s| std::mem::replace(&mut s.tracking_nc_leave, true)) {
+        let mut tme = TRACKMOUSEEVENT { cbSize: size_of::<TRACKMOUSEEVENT>() as u32, dwFlags: TME_LEAVE | TME_NONCLIENT, hwndTrack: hwnd, dwHoverTime: 0 };
+        unsafe {
+            let _ = TrackMouseEvent(&mut tme);
+        }
+    }
+    unsafe {
+        let _ = InvalidateRect(Some(hwnd), None, false);
+    }
+}
+
+/// A caption button was clicked: the usual system commands, so Windows animates them.
+fn press_caption_button(hwnd: HWND, button: Option<CaptionButton>) {
+    let command = match button {
+        Some(CaptionButton::Minimize) => SC_MINIMIZE,
+        Some(CaptionButton::Maximize) if unsafe { IsZoomed(hwnd).as_bool() } => SC_RESTORE,
+        Some(CaptionButton::Maximize) => SC_MAXIMIZE,
+        Some(CaptionButton::Close) => SC_CLOSE,
+        None => return,
+    };
+    with_shell(hwnd, |s| s.chrome.hover = None);
+    unsafe {
+        let _ = PostMessageW(Some(hwnd), WM_SYSCOMMAND, WPARAM(command as usize), LPARAM(0));
+    }
+}
+
+/// Opens the menu-bar popup under client x (pixels), if a title is there.
+fn open_bar_menu(hwnd: HWND, x: f64) {
+    let menus = with_shell(hwnd, |s| menu_bar(&s.state));
+    let rects = title_layout(hwnd).menus;
     let Some(i) = rects.iter().position(|r| x >= r.x && x < r.right()) else { return };
     let mut at = POINT { x: rects[i].x as i32, y: rects[i].bottom() as i32 };
     unsafe {
         let _ = ClientToScreen(hwnd, &mut at);
     }
-    with_shell(hwnd, |s| s.open_menu = Some(i));
+    with_shell(hwnd, |s| s.chrome.open_menu = Some(i));
     unsafe {
         let _ = InvalidateRect(Some(hwnd), None, false);
     }
     let chosen = menus::pick(hwnd, &menus[i].items, at);
-    with_shell(hwnd, |s| s.open_menu = None);
+    with_shell(hwnd, |s| s.chrome.open_menu = None);
     unsafe {
         let _ = InvalidateRect(Some(hwnd), None, false);
     }
