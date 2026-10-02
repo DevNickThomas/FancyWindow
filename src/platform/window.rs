@@ -49,15 +49,25 @@ pub fn run(state: AppState, settings_path: PathBuf) -> Result<()> {
         let maximized = state.settings.window_maximized;
         let hwnd = create_window(state, settings_path)?;
         MAIN.set(hwnd);
-        // Fires when any other process's window finishes a move: the Alt+drag drop.
-        let hook = SetWinEventHook(
-            EVENT_SYSTEM_MOVESIZEEND,
+        // Fires when any other process's window starts and finishes a move: the Alt+drag drop.
+        let move_hook = SetWinEventHook(
+            EVENT_SYSTEM_MOVESIZESTART,
             EVENT_SYSTEM_MOVESIZEEND,
             None,
-            Some(on_move_size_end),
+            Some(on_move_size),
             0,
             0,
             WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+        );
+        // Any window coming to the front, our own included (which clears the highlight).
+        let focus_hook = SetWinEventHook(
+            EVENT_SYSTEM_FOREGROUND,
+            EVENT_SYSTEM_FOREGROUND,
+            None,
+            Some(on_foreground),
+            0,
+            0,
+            WINEVENT_OUTOFCONTEXT,
         );
         SetTimer(Some(hwnd), PURGE_TIMER, PURGE_INTERVAL_MS, None);
         hotkeys::install(hwnd, with_shell(hwnd, |s| s.state.hotkey_bindings()));
@@ -69,7 +79,8 @@ pub fn run(state: AppState, settings_path: PathBuf) -> Result<()> {
             let _ = TranslateMessage(&message);
             DispatchMessageW(&message);
         }
-        let _ = UnhookWinEvent(hook);
+        let _ = UnhookWinEvent(move_hook);
+        let _ = UnhookWinEvent(focus_hook);
     }
     Ok(())
 }
@@ -222,7 +233,10 @@ fn run_effect(hwnd: HWND, effect: Effect) {
                 }
                 let _ = SetForegroundWindow(hwnd);
             }
-            Effect::StayBackIndicator(true) => indicator::show(hwnd, theme(hwnd)),
+            Effect::StayBackIndicator(true) => {
+                let chord = with_shell(hwnd, |s| s.state.chord_label(Command::BringToFront));
+                indicator::show(hwnd, theme(hwnd), chord);
+            }
             Effect::StayBackIndicator(false) => indicator::hide(),
             Effect::ShowZoneMenu { zone, at } => show_zone_menu(hwnd, zone, at),
             Effect::OpenSettingsFolder => menus::open_folder(hwnd, &storage::exe_dir()),
@@ -306,9 +320,14 @@ fn purge_closed_windows(hwnd: HWND) {
     }
 }
 
-unsafe extern "system" fn on_move_size_end(_: HWINEVENTHOOK, _: u32, window: HWND, id_object: i32, _: i32, _: u32, _: u32) {
+unsafe extern "system" fn on_move_size(_: HWINEVENTHOOK, event: u32, window: HWND, id_object: i32, _: i32, _: u32, _: u32) {
     let main = MAIN.get();
     if id_object != OBJID_WINDOW.0 || window.is_invalid() || window == main {
+        return;
+    }
+    let id = WindowId(window.0 as isize);
+    if event == EVENT_SYSTEM_MOVESIZESTART {
+        host::move_started(id);
         return;
     }
     let mut cursor = POINT::default();
@@ -317,7 +336,15 @@ unsafe extern "system" fn on_move_size_end(_: HWINEVENTHOOK, _: u32, window: HWN
         GetAsyncKeyState(VK_MENU.0 as i32) as u16 & 0x8000 != 0
     };
     let at = Point::new(cursor.x as f64, cursor.y as f64);
-    dispatch(main, Msg::WindowDropped { window: WindowId(window.0 as isize), at, alt });
+    dispatch(main, Msg::WindowDropped { window: id, at, alt });
+    host::move_ended();
+}
+
+unsafe extern "system" fn on_foreground(_: HWINEVENTHOOK, _: u32, window: HWND, id_object: i32, _: i32, _: u32, _: u32) {
+    if id_object != OBJID_WINDOW.0 || window.is_invalid() {
+        return;
+    }
+    dispatch(MAIN.get(), Msg::ForegroundChanged(WindowId(window.0 as isize)));
 }
 
 fn set_cursor(hwnd: HWND) {

@@ -1,0 +1,77 @@
+use fancy_window::app::*;
+use fancy_window::model::*;
+
+const A: WindowId = WindowId(1);
+const B: WindowId = WindowId(2);
+
+/// Two columns on an 800x600 canvas at the screen origin.
+fn two_columns() -> AppState {
+    let mut state = AppState::new();
+    state.layout = GridLayout::equal_columns(2);
+    update(&mut state, Msg::FrameChanged(Frame::new(800.0, 600.0, Point::new(0.0, 0.0), 1.0)));
+    state
+}
+
+fn save_workspace(state: &mut AppState, slot: usize, name: &str) {
+    update(state, Msg::WorkspaceNamed { slot, name: name.into(), saved_at_utc: "2026-10-02T00:00:00Z".into() });
+}
+
+#[test]
+fn shows_zone_and_window_counts_and_margin() {
+    let mut state = two_columns();
+    update(&mut state, Msg::WindowDropped { window: A, at: Point::new(200.0, 300.0), alt: true });
+    let bar = state.status_bar();
+    assert_eq!(bar.left, vec![Segment::Plain("2 zones \u{00B7} 1 hosted".into()), Segment::Plain("Margin 0".into())]);
+    // One window: nothing to cycle between, so no hint.
+    assert_eq!(bar.hint, None);
+}
+
+#[test]
+fn singular_zone() {
+    let mut state = two_columns();
+    state.layout = GridLayout::new(GridNode::new_leaf());
+    assert_eq!(state.status_bar().left[0], Segment::Plain("1 zone \u{00B7} 0 hosted".into()));
+}
+
+#[test]
+fn cycle_hint_uses_the_users_chord() {
+    let mut state = two_columns();
+    update(&mut state, Msg::WindowDropped { window: A, at: Point::new(200.0, 300.0), alt: true });
+    update(&mut state, Msg::WindowDropped { window: B, at: Point::new(600.0, 300.0), alt: true });
+    assert_eq!(state.status_bar().hint.as_deref(), Some("Win+Alt+] next window"));
+    update(&mut state, Msg::SetHotkey { command: Command::CycleNext, chord: Chord::parse("Ctrl+Alt+OemOpenBrackets") });
+    assert_eq!(state.status_bar().hint.as_deref(), Some("Ctrl+Alt+[ next window"));
+}
+
+#[test]
+fn names_the_workspace_on_screen_until_the_layout_changes() {
+    let mut state = two_columns();
+    save_workspace(&mut state, 2, "Coding");
+    assert_eq!(state.current_workspace(), Some(2));
+    assert_eq!(state.status_bar().left[0], Segment::Strong("Coding".into()));
+    // Splitting a zone means it is no longer the saved layout.
+    update(&mut state, Msg::MouseDown { at: Point::new(200.0, 300.0), button: Button::Left, mods: Modifiers { ctrl: true, shift: false } });
+    assert_eq!(state.current_workspace(), None);
+    assert!(!matches!(state.status_bar().left[0], Segment::Strong(_)));
+    // Loading it again brings the name back.
+    update(&mut state, Msg::Menu(MenuAction::LoadWorkspace(2)));
+    assert_eq!(state.current_workspace(), Some(2));
+}
+
+#[test]
+fn profile_and_workspace_share_the_strong_segment() {
+    let mut state = AppState::from_settings(Settings::default(), Some("work".into()));
+    state.layout = GridLayout::equal_columns(2);
+    assert_eq!(state.status_bar().left[0], Segment::Strong("Profile: work".into()));
+    save_workspace(&mut state, 0, "Coding");
+    assert_eq!(state.status_bar().left[0], Segment::Strong("Coding \u{00B7} Profile: work".into()));
+}
+
+#[test]
+fn warns_while_held_at_the_back() {
+    let mut state = two_columns();
+    update(&mut state, Msg::Command(Command::SendToBack));
+    assert_eq!(state.status_bar().left[0], Segment::Warning("Held at the back \u{00B7} Win+Alt+PageUp brings it forward".into()));
+    update(&mut state, Msg::Command(Command::BringToFront));
+    assert!(!state.status_bar().left.iter().any(|s| matches!(s, Segment::Warning(_))));
+}

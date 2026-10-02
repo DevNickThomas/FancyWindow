@@ -1,8 +1,10 @@
 //! Thin wrappers over GDI drawing calls.
 
-use windows::Win32::Foundation::{COLORREF, RECT, SIZE};
+use std::sync::OnceLock;
+
+use windows::Win32::Foundation::{COLORREF, LPARAM, RECT, SIZE};
 use windows::Win32::Graphics::Gdi::*;
-use windows::core::w;
+use windows::core::{PCWSTR, w};
 
 use super::theme::Color;
 use crate::model::Rect;
@@ -91,13 +93,38 @@ pub fn text_width(hdc: HDC, s: &str, px_height: i32) -> i32 {
     size.cx
 }
 
-/// Runs `f` with Segoe UI at `px_height` selected into the DC.
+/// The UI font: Segoe UI Variable (Windows 11) where installed, else Segoe UI.
+/// Asking GDI for a missing face silently gives a different font, so check once.
+pub fn ui_face() -> PCWSTR {
+    static VARIABLE: OnceLock<bool> = OnceLock::new();
+    if *VARIABLE.get_or_init(|| font_installed("Segoe UI Variable Text")) { w!("Segoe UI Variable Text") } else { w!("Segoe UI") }
+}
+
+fn font_installed(face: &str) -> bool {
+    unsafe extern "system" fn found(_: *const LOGFONTW, _: *const TEXTMETRICW, _: u32, seen: LPARAM) -> i32 {
+        unsafe { *(seen.0 as *mut bool) = true };
+        0
+    }
+    let mut query = LOGFONTW { lfCharSet: DEFAULT_CHARSET, ..Default::default() };
+    for (dst, src) in query.lfFaceName.iter_mut().zip(face.encode_utf16().take(31)) {
+        *dst = src;
+    }
+    let mut seen = false;
+    unsafe {
+        let hdc = GetDC(None);
+        EnumFontFamiliesExW(hdc, &query, Some(found), LPARAM(&mut seen as *mut bool as isize), 0);
+        ReleaseDC(None, hdc);
+    }
+    seen
+}
+
+/// Runs `f` with the UI font at `px_height` selected into the DC.
 fn with_font(hdc: HDC, px_height: i32, f: impl FnOnce()) {
     unsafe {
         let font = CreateFontW(
             -px_height, 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0,
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-            0, w!("Segoe UI"),
+            0, ui_face(),
         );
         let old_font = SelectObject(hdc, font.into());
         f();

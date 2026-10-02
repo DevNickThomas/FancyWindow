@@ -38,6 +38,11 @@ impl Rect {
         p.x >= self.x && p.x < self.right() && p.y >= self.y && p.y < self.bottom()
     }
 
+    /// Grown by `by` on every side (shrunk if negative).
+    pub fn inflate(&self, by: f64) -> Rect {
+        Rect::new(self.x - by, self.y - by, self.width + 2.0 * by, self.height + 2.0 * by)
+    }
+
     /// Smallest rect covering both.
     pub fn union(&self, other: &Rect) -> Rect {
         let x = self.x.min(other.x);

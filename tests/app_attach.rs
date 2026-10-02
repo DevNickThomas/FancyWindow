@@ -51,8 +51,62 @@ fn alt_drop_over_zone_hosts_window_in_that_zone() {
     let right = state.layout.leaves()[1];
     let effects = drop_at(&mut state, WIN, 700.0, 300.0, true);
     // Right zone is canvas (400,0,400,600) -> host (404,2,394,596) -> screen +(100,50).
-    assert_eq!(effects, vec![Effect::Host { window: WIN, rect: Rect::new(504.0, 52.0, 394.0, 596.0) }]);
+    assert_eq!(effects, vec![Effect::Host { window: WIN, rect: Rect::new(504.0, 52.0, 394.0, 596.0) }, Effect::Repaint]);
     assert_eq!(state.zone_of(WIN), Some(right));
+}
+
+// active window highlight
+
+#[test]
+fn a_dropped_window_is_active_and_highlighted() {
+    let mut state = two_columns();
+    drop_at(&mut state, WIN, 700.0, 300.0, true);
+    assert_eq!(state.active, Some(WIN));
+    let h = state.active_highlight().expect("highlight");
+    // Glow covers the whole zone, splitter half included; the bevel hugs the window 2 DIPs out.
+    assert_eq!(h.glow, Rect::new(400.0, 0.0, 400.0, 600.0));
+    assert_eq!(h.bevel, Rect::new(402.0, 0.0, 398.0, 600.0));
+}
+
+#[test]
+fn focus_moves_the_highlight_between_hosted_windows_only() {
+    let mut state = two_columns();
+    drop_at(&mut state, WIN, 700.0, 300.0, true);
+    drop_at(&mut state, OTHER, 200.0, 300.0, true);
+    assert_eq!(update(&mut state, Msg::ForegroundChanged(WIN)), vec![Effect::Repaint]);
+    assert_eq!(state.active, Some(WIN));
+    // The same window again changes nothing.
+    assert!(update(&mut state, Msg::ForegroundChanged(WIN)).is_empty());
+    // Any other app (or Fancy Window itself) clears it.
+    assert_eq!(update(&mut state, Msg::ForegroundChanged(WindowId(0x9999))), vec![Effect::Repaint]);
+    assert_eq!(state.active_highlight(), None);
+}
+
+#[test]
+fn bevel_follows_the_margin() {
+    let mut state = two_columns();
+    drop_at(&mut state, WIN, 200.0, 300.0, true);
+    state.margin = 10.0;
+    let h = state.active_highlight().expect("highlight");
+    // Window at (12,12)-(386,588) with margin 10; bevel 2 DIPs outside it.
+    assert_eq!(h.bevel, Rect::new(10.0, 10.0, 378.0, 580.0));
+}
+
+#[test]
+fn a_released_window_loses_the_highlight() {
+    let mut state = two_columns();
+    drop_at(&mut state, WIN, 700.0, 300.0, true);
+    drop_at(&mut state, WIN, 900.0, 300.0, true); // Alt+drag it out
+    assert_eq!(state.active_highlight(), None);
+}
+
+#[test]
+fn activating_a_hosted_window_moves_the_cycle_there() {
+    let mut state = two_columns();
+    drop_at(&mut state, WIN, 700.0, 300.0, true);
+    drop_at(&mut state, OTHER, 200.0, 300.0, true);
+    update(&mut state, Msg::ForegroundChanged(WIN));
+    assert_eq!(state.cycle, Some(WIN));
 }
 
 #[test]
@@ -91,7 +145,8 @@ fn moving_a_hosted_window_snaps_it_back() {
 fn alt_moving_a_hosted_window_lets_it_go_where_it_is() {
     let mut state = two_columns();
     drop_at(&mut state, WIN, 700.0, 300.0, true);
-    assert_eq!(drop_at(&mut state, WIN, 200.0, 300.0, true), vec![Effect::Forget(WIN)]);
+    // Repaint: the status bar's hosted count and the highlight change.
+    assert_eq!(drop_at(&mut state, WIN, 200.0, 300.0, true), vec![Effect::Forget(WIN), Effect::Repaint]);
     assert!(state.attachments.is_empty());
 }
 
@@ -155,7 +210,8 @@ fn unrelated_messages_do_not_move_hosted_windows() {
 fn closed_window_is_forgotten_silently() {
     let mut state = two_columns();
     drop_at(&mut state, WIN, 700.0, 300.0, true);
-    assert!(update(&mut state, Msg::WindowClosed(WIN)).is_empty());
+    // Nothing is sent to the dead window; the status bar just repaints.
+    assert_eq!(update(&mut state, Msg::WindowClosed(WIN)), vec![Effect::Repaint]);
     assert!(state.attachments.is_empty());
 }
 

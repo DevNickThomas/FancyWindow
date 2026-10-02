@@ -33,11 +33,14 @@ then try key combinations. Each one is checked as you press it: **Available**,
 
 | Chord | Action |
 | --- | --- |
-| `Ctrl+Win+B` | Send Fancy Window behind everything (stays back while you attach) |
-| `Ctrl+Win+H` | Bring it forward and leave stay-back |
-| `Ctrl+Win+]` / `[` | Focus the next / previous hosted window, across instances |
-| `Ctrl+Win+=` / `-` | Increase / decrease the hosted-window margin |
-| `Ctrl+Win+R` | Reset to a 2x2 grid |
+| `Win+Alt+PageDown` | Send Fancy Window behind everything (stays back while you attach) |
+| `Win+Alt+PageUp` | Bring it forward and leave stay-back |
+| `Win+Alt+]` / `[` | Focus the next / previous hosted window, across instances |
+| `Win+Alt+=` / `-` | Increase / decrease the hosted-window margin |
+| `Win+Alt+Home` | Reset to a 2x2 grid |
+
+Defaults avoid `Ctrl+Win`, which many other tools use. `Win+Alt+B` and `Win+Alt+R`
+belong to Windows (HDR toggle, Game Bar recording), hence PageUp/PageDown and Home.
 
 Workspace hotkeys are set under **Workspaces > Set hotkey**. Changed hotkeys are
 saved in `settings.json` under `hotkeys`.

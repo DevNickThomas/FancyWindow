@@ -3,13 +3,17 @@ use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::WindowsAndMessaging::GetClientRect;
 
 use super::gdi::{self, Align};
-use super::{MENU_BAR_HEIGHT, STATUS_BAR_HEIGHT, Theme, canvas_top_px, theme_of, to_px};
-use crate::app::AppState;
+use super::{Color, MENU_BAR_HEIGHT, STATUS_BAR_HEIGHT, Theme, canvas_top_px, theme_of, to_px};
+use crate::app::{AppState, Segment};
 use crate::model::Rect;
 
 const ZONE_RADIUS: f64 = 4.0;
-const BAR_FONT: f64 = 15.0;
+/// Menu-bar titles, at VS Code's 13px UI size.
+const BAR_FONT: f64 = 13.0;
+const STATUS_FONT: f64 = 12.0;
 const STATUS_PADDING: f64 = 10.0;
+/// Space either side of each status-bar segment's text.
+const SEGMENT_PADDING: f64 = 9.0;
 const MENU_TITLE_PADDING: f64 = 9.0;
 const HIGHLIGHT_WIDTH: f64 = 2.0;
 const REMINDER_FONT: f64 = 14.0;
@@ -44,7 +48,7 @@ pub fn paint(hwnd: HWND, state: &AppState, titles: &[&str], open_menu: Option<us
     }
 }
 
-/// Zones, splitters, split preview and cycle highlight, shifted below the menu bar.
+/// Zones, splitters, split preview and the active-window highlight, shifted below the menu bar.
 fn draw_canvas(hdc: HDC, state: &AppState, theme: &Theme) {
     let scale = state.frame.scale;
     let mut previous = POINT::default();
@@ -58,11 +62,13 @@ fn draw_canvas(hdc: HDC, state: &AppState, theme: &Theme) {
     for splitter in state.splitters() {
         gdi::fill(hdc, to_px(splitter.bounds, scale), theme.splitter);
     }
+    // After the splitters, so the glow spills onto the splitter halves beside the zone.
+    if let Some(active) = state.active_highlight() {
+        gdi::rounded(hdc, to_px(active.glow, scale), theme.active_glow, theme.active_glow, radius);
+        gdi::outline(hdc, to_px(active.bevel, scale), theme.active_bevel, (HIGHLIGHT_WIDTH * scale).round() as i32, radius);
+    }
     if let Some(line) = state.split_preview() {
         gdi::fill(hdc, to_px(line, scale), theme.accent);
-    }
-    if let Some(zone) = state.cycle_highlight() {
-        gdi::outline(hdc, to_px(zone, scale), theme.accent, (HIGHLIGHT_WIDTH * scale).round() as i32, radius);
     }
     unsafe {
         let _ = SetViewportOrgEx(hdc, previous.x, previous.y, None);
@@ -108,20 +114,40 @@ fn title_rects(hdc: HDC, titles: &[&str], scale: f64) -> Vec<Rect> {
         .collect()
 }
 
+/// Accent-coloured bar: state segments from the left; hint, "?" and version on the right.
 fn draw_status_bar(hdc: HDC, client: Rect, state: &AppState, theme: &Theme) {
     let scale = state.frame.scale;
     let height = STATUS_BAR_HEIGHT * scale;
     let bar = Rect::new(0.0, client.height - height, client.width, height);
-    gdi::fill(hdc, bar, theme.bar_bg);
-    gdi::fill(hdc, Rect::new(bar.x, bar.y, bar.width, 1.0), theme.divider);
-    let pad = STATUS_PADDING * scale;
-    let inner = Rect::new(bar.x + pad, bar.y, bar.width - 2.0 * pad, bar.height);
-    let font = (BAR_FONT * scale).round() as i32;
-    if let Some(profile) = &state.profile {
-        gdi::text(hdc, inner, &format!("Profile: {profile}"), theme.muted, font, Align::Left);
+    gdi::fill(hdc, bar, theme.status_bg);
+    let font = (STATUS_FONT * scale).round() as i32;
+    let pad = SEGMENT_PADDING * scale;
+    let status = state.status_bar();
+    let mut x = bar.x;
+    for segment in &status.left {
+        let (text, background, color) = match segment {
+            Segment::Strong(t) => (t, Some(theme.status_strong), theme.status_text),
+            Segment::Plain(t) => (t, None, theme.status_text),
+            Segment::Warning(t) => (t, Some(theme.status_warn), Color(0xFF, 0xFF, 0xFF)),
+        };
+        let rect = Rect::new(x, bar.y, gdi::text_width(hdc, text, font) as f64 + 2.0 * pad, bar.height);
+        if let Some(background) = background {
+            gdi::fill(hdc, rect, background);
+        }
+        gdi::text(hdc, rect, text, color, font, Align::Center);
+        x = rect.right();
     }
-    gdi::text(hdc, inner, VERSION, theme.muted, font, Align::Right);
-    gdi::text(hdc, help_rect(hdc, client, scale), "?", theme.muted, font, Align::Center);
+    let inner = Rect::new(bar.x + STATUS_PADDING * scale, bar.y, bar.width - 2.0 * STATUS_PADDING * scale, bar.height);
+    gdi::text(hdc, inner, VERSION, theme.status_text, font, Align::Right);
+    let help = help_rect(hdc, client, scale);
+    gdi::text(hdc, help, "?", theme.status_text, font, Align::Center);
+    if let Some(hint) = &status.hint {
+        let width = gdi::text_width(hdc, hint, font) as f64 + 2.0 * pad;
+        // Only when it fits beside the segments; a narrow window drops it.
+        if help.x - width >= x {
+            gdi::text(hdc, Rect::new(help.x - width, bar.y, width, bar.height), hint, theme.status_text, font, Align::Center);
+        }
+    }
 }
 
 /// The "?" in the status bar that opens the keyboard shortcuts, in client pixels.
@@ -135,7 +161,7 @@ pub fn status_help_rect(hwnd: HWND, client: Rect, scale: f64) -> Rect {
 }
 
 fn help_rect(hdc: HDC, client: Rect, scale: f64) -> Rect {
-    let font = (BAR_FONT * scale).round() as i32;
+    let font = (STATUS_FONT * scale).round() as i32;
     let height = STATUS_BAR_HEIGHT * scale;
     let width = 24.0 * scale;
     let right = client.width - STATUS_PADDING * scale - gdi::text_width(hdc, VERSION, font) as f64 - 6.0 * scale;

@@ -1,6 +1,6 @@
 use crate::model::{Orientation, Point};
 
-use super::attach::{forget_all, raise_all, reflow, window_dropped};
+use super::attach::{foreground_changed, forget_all, raise_all, reflow, window_dropped};
 use super::command::{self, begin_cycle_at_edge, cycle};
 use super::{hotkeys, menu, workspace};
 use super::{AppState, Button, Drag, Effect, Modifiers, Msg};
@@ -11,11 +11,19 @@ const MIN_DRAG_STEP: f64 = 0.5;
 /// The single place where state changes. Returns what the platform must do next.
 ///
 /// Whenever the layout, frame or margin changes, hosted windows are moved to match.
+/// Whenever anything the status bar or highlight shows changes, it is repainted.
 pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
     let before = (state.layout.clone(), state.frame, state.margin);
+    let shown = |s: &AppState| (s.layout.clone(), s.margin, s.attachments.clone(), s.stay_back, s.active);
+    let shown_before = shown(state);
+    // A window about to be destroyed needs no repaint, and saving stays the last effect.
+    let closing = matches!(msg, Msg::Closing { .. });
     let mut effects = handle(state, msg);
     if (state.layout.clone(), state.frame, state.margin) != before {
         effects.extend(reflow(state));
+    }
+    if !closing && shown(state) != shown_before && !effects.contains(&Effect::Repaint) {
+        effects.push(Effect::Repaint);
     }
     effects
 }
@@ -35,6 +43,7 @@ fn handle(state: &mut AppState, msg: Msg) -> Vec<Effect> {
             vec![]
         }
         Msg::Activated => raise_all(state),
+        Msg::ForegroundChanged(window) => foreground_changed(state, window),
         Msg::Closing { bounds } => {
             state.settings = state.current_settings();
             state.settings.set_bounds(bounds);

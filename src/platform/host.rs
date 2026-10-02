@@ -26,6 +26,9 @@ struct Original {
 
 thread_local! {
     static ORIGINALS: RefCell<HashMap<WindowId, Original>> = RefCell::new(HashMap::new());
+    /// Where the window being dragged was when the drag began. Windows are hosted on
+    /// the drop, by when they already sit over Fancy Window; this is where they came from.
+    static MOVE_START: RefCell<Option<(WindowId, RECT)>> = const { RefCell::new(None) };
     static TASKBAR: OnceCell<Option<ITaskbarList>> = const { OnceCell::new() };
 }
 
@@ -46,10 +49,11 @@ pub fn host(anchor: HWND, window: WindowId, rect: Rect) {
     let h = hwnd(window);
     let known = ORIGINALS.with_borrow(|o| o.contains_key(&window));
     if !known {
+        let before_drag = MOVE_START.with_borrow(|s| s.filter(|(w, _)| *w == window).map(|(_, r)| r));
         let original = unsafe {
             let mut r = RECT::default();
             let _ = GetWindowRect(h, &mut r);
-            Original { rect: r, style: GetWindowLongPtrW(h, GWL_STYLE), ex_style: GetWindowLongPtrW(h, GWL_EXSTYLE) }
+            Original { rect: before_drag.unwrap_or(r), style: GetWindowLongPtrW(h, GWL_STYLE), ex_style: GetWindowLongPtrW(h, GWL_EXSTYLE) }
         };
         ORIGINALS.with_borrow_mut(|o| o.insert(window, original));
         unsafe { SetWindowLongPtrW(h, GWL_STYLE, original.style & !STRIPPED_STYLE) };
@@ -63,6 +67,20 @@ pub fn host(anchor: HWND, window: WindowId, rect: Rect) {
     }
     raise(anchor, window);
     add_taskbar_tab(h);
+}
+
+/// A window started moving: remember where it was (see `MOVE_START`).
+pub fn move_started(window: WindowId) {
+    let mut r = RECT::default();
+    unsafe {
+        let _ = GetWindowRect(hwnd(window), &mut r);
+    }
+    MOVE_START.set(Some((window, r)));
+}
+
+/// The move is over, hosted or not.
+pub fn move_ended() {
+    MOVE_START.set(None);
 }
 
 /// Moves a hosted window without waiting for it to respond (keeps splitter drags smooth).

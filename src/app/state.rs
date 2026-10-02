@@ -22,9 +22,11 @@ pub struct AppState {
     pub settings: Settings,
     /// `--profile` name; `None` for the default profile.
     pub profile: Option<String>,
-    /// The hosted window the last Ctrl+Win+] / [ focused.
+    /// The hosted window the last Win+Alt+] / [ focused, or the user last activated.
     pub cycle: Option<WindowId>,
-    /// Sticky Ctrl+Win+B: stay at the back, even after attaching windows.
+    /// The foreground window, if it is one of ours; its zone is drawn with the active glow.
+    pub active: Option<WindowId>,
+    /// Sticky Win+Alt+PageDown: stay at the back, even after attaching windows.
     pub stay_back: bool,
 }
 
@@ -61,6 +63,7 @@ impl AppState {
             settings,
             profile,
             cycle: None,
+            active: None,
             stay_back: false,
         }
     }

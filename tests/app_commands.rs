@@ -96,12 +96,20 @@ fn receiving_a_hand_off_lands_on_first_or_last() {
 }
 
 #[test]
-fn cycle_highlight_outlines_the_focused_windows_zone() {
+fn cycling_highlights_the_focused_windows_zone() {
     let mut state = with_three_windows();
-    assert_eq!(state.cycle_highlight(), None);
+    update(&mut state, Msg::ForegroundChanged(WindowId(0x9999)));
+    assert_eq!(state.active_highlight(), None);
     cycle(&mut state, true, false);
     cycle(&mut state, true, false);
-    assert_eq!(state.cycle_highlight(), Some(Rect::new(300.0, 0.0, 300.0, 600.0)));
+    assert_eq!(state.active_highlight().map(|h| h.glow), Some(Rect::new(300.0, 0.0, 300.0, 600.0)));
+}
+
+#[test]
+fn cycling_carries_on_from_the_window_the_user_clicked() {
+    let mut state = with_three_windows();
+    update(&mut state, Msg::ForegroundChanged(B));
+    assert_eq!(cycle(&mut state, true, false)[0], Effect::Focus(C));
 }
 
 #[test]
@@ -144,7 +152,8 @@ fn bring_to_front_or_clicking_leaves_stay_back() {
 
     command(&mut state, Command::SendToBack);
     let click = update(&mut state, Msg::MouseDown { at: Point::new(10.0, 10.0), button: Button::Left, mods: Modifiers::default() });
-    assert_eq!(click, vec![Effect::StayBackIndicator(false)]);
+    // Repaint drops the status bar's "Held at the back" segment.
+    assert_eq!(click, vec![Effect::StayBackIndicator(false), Effect::Repaint]);
     assert!(!state.stay_back);
 }
 

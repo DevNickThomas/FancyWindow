@@ -87,6 +87,9 @@ pub const PRESETS: &[Preset] = &[
 ];
 
 pub const DEFAULT_ACCENT: Color = rgb(0x007ACC);
+const WHITE: Color = rgb(0xFFFFFF);
+/// Accent strength behind the focused window, against 0x33/255 (20%) for the other zones.
+const ACTIVE_GLOW_ALPHA: f64 = 0.45;
 
 /// Accent swatches offered in Preferences.
 pub const ACCENT_SWATCHES: [Color; 8] =
@@ -108,6 +111,15 @@ pub struct Theme {
     /// Selected or highlighted item background, and its text.
     pub active_bg: Color,
     pub active_text: Color,
+    /// The focused hosted window's zone: a stronger tint than `zone_fill`...
+    pub active_glow: Color,
+    /// ...and the bright ring right around the window.
+    pub active_bevel: Color,
+    /// The accent-coloured status bar, its text, its workspace segment and its warning segment.
+    pub status_bg: Color,
+    pub status_text: Color,
+    pub status_strong: Color,
+    pub status_warn: Color,
 }
 
 impl Theme {
@@ -128,6 +140,14 @@ impl Theme {
             muted: p.muted,
             active_bg: accent.darken(0.45),
             active_text: p.active_text,
+            active_glow: accent.over(p.window_bg, ACTIVE_GLOW_ALPHA),
+            // Lifted toward white on dark themes; on light ones a touch darker so it still shows.
+            active_bevel: if p.window_bg.is_light() { accent.darken(0.15) } else { WHITE.over(accent, 0.35) },
+            status_bg: accent,
+            // Light accents (yellow, green) need dark text to stay readable.
+            status_text: if accent.is_light() { rgb(0x1F1F1F) } else { WHITE },
+            status_strong: accent.darken(0.22),
+            status_warn: rgb(0xC27C0E),
         }
     }
 

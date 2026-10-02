@@ -40,27 +40,30 @@ impl Chord {
         Some(Self { modifiers, key: key_code(key_name)? })
     }
 
-    /// Ctrl, Alt, Shift, Win, then the key, e.g. "Ctrl+Win+OemPlus".
+    /// Ctrl, Alt, Shift, Win, then the key, e.g. "Ctrl+Win+OemPlus". The .NET app's order.
     pub fn format(&self) -> String {
-        self.join(key_name(self.key))
+        self.join(key_name(self.key), FILE_ORDER)
     }
 
-    /// For people rather than files: symbols instead of WPF names, e.g. "Ctrl+Win+]".
+    /// For people rather than files: symbols instead of WPF names, and Win before Alt
+    /// as Windows writes it, e.g. "Win+Alt+]".
     pub fn display(&self) -> String {
         let name = key_name(self.key);
         let symbol = DISPLAY_NAMES.iter().find(|(n, _)| *n == name).map(|(_, s)| s.to_string());
         let digit = name.strip_prefix('D').filter(|d| d.len() == 1).map(str::to_string);
-        self.join(symbol.or(digit).unwrap_or(name))
+        self.join(symbol.or(digit).unwrap_or(name), DISPLAY_ORDER)
     }
 
-    fn join(&self, key: String) -> String {
-        let flags = [(MOD_CONTROL, "Ctrl"), (MOD_ALT, "Alt"), (MOD_SHIFT, "Shift"), (MOD_WIN, "Win")];
+    fn join(&self, key: String, order: &[(u32, &str)]) -> String {
         let mut parts: Vec<String> =
-            flags.iter().filter(|(f, _)| self.modifiers & f != 0).map(|(_, n)| n.to_string()).collect();
+            order.iter().filter(|(f, _)| self.modifiers & f != 0).map(|(_, n)| n.to_string()).collect();
         parts.push(key);
         parts.join("+")
     }
 }
+
+const FILE_ORDER: &[(u32, &str)] = &[(MOD_CONTROL, "Ctrl"), (MOD_ALT, "Alt"), (MOD_SHIFT, "Shift"), (MOD_WIN, "Win")];
+const DISPLAY_ORDER: &[(u32, &str)] = &[(MOD_CONTROL, "Ctrl"), (MOD_WIN, "Win"), (MOD_ALT, "Alt"), (MOD_SHIFT, "Shift")];
 
 /// Named keys outside the letter/digit/function ranges.
 const NAMED_KEYS: &[(&str, u16)] = &[

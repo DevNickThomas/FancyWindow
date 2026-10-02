@@ -199,7 +199,7 @@ impl Dialog {
             let hwnd = CreateWindowExW(WS_EX_DLGMODALFRAME | WS_EX_CONTROLPARENT, w!("FancyWindowDialog"), &HSTRING::from(title), style, x, y, w, h, Some(owner), None, Some(instance.into()), None)
                 .expect("dialog window");
             chrome::title_bar(hwnd, &theme);
-            let font = CreateFontW(-((FONT * scale) as i32), 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, 0, w!("Segoe UI"));
+            let font = CreateFontW(-((FONT * scale) as i32), 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, 0, gdi::ui_face());
             Self { owner, hwnd, scale, font }
         }
     }
