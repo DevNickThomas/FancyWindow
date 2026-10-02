@@ -371,7 +371,12 @@ fn draw_status_bar(hdc: HDC, client: Rect, state: &AppState, theme: &Theme) {
         let mut x = rect.x + pad;
         if let Some(icon) = segment_icon(segment.click) {
             let size = (STATUS_ICON * scale).round();
-            gdi::glyph(hdc, Rect::new(x, rect.y, size, rect.height), icon, color, size as i32);
+            let cell = Rect::new(x, rect.y, size, rect.height);
+            if segment.click == Some(StatusClick::WorkspacesMenu) {
+                draw_bookmark(hdc, cell, color, scale);
+            } else {
+                gdi::glyph(hdc, cell, icon, color, size as i32);
+            }
             x += size + (STATUS_ICON_GAP * scale).round();
         }
         gdi::text(hdc, Rect::new(x, rect.y, rect.right() - x, rect.height), &segment.text, color, font, Align::Left);
@@ -381,4 +386,17 @@ fn draw_status_bar(hdc: HDC, client: Rect, state: &AppState, theme: &Theme) {
     }
     gdi::text(hdc, layout.help, "?", theme.status_text, font, Align::Center);
     gdi::text(hdc, layout.version, VERSION, theme.status_text, font, Align::Right);
+}
+
+/// The mockup's bookmark ribbon (its SVG path `M3 2h10v12l-5-3-5 3z` in a 16 unit box),
+/// drawn as lines: no symbol font has this exact shape.
+fn draw_bookmark(hdc: HDC, cell: Rect, color: Color, scale: f64) {
+    let unit = cell.width / 16.0;
+    let (ox, oy) = (cell.x, cell.y + (cell.height - cell.width) / 2.0);
+    let at = |x: f64, y: f64| ((ox + x * unit).round() as i32, (oy + y * unit).round() as i32);
+    let points = [at(3.0, 2.0), at(13.0, 2.0), at(13.0, 14.0), at(8.0, 11.0), at(3.0, 14.0), at(3.0, 2.0)];
+    let width = (1.3 * scale).round().max(1.0) as i32;
+    for pair in points.windows(2) {
+        gdi::line(hdc, pair[0], pair[1], color, width);
+    }
 }
