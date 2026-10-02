@@ -51,6 +51,8 @@ pub fn workspace_menu(state: &AppState) -> Vec<MenuItem> {
     };
     items.push(MenuItem::Separator);
     items.push(MenuItem::Submenu { label: "Save current as".into(), items: slots(MenuAction::SaveWorkspace, false) });
+    items.push(MenuItem::Submenu { label: "Rename".into(), items: slots(MenuAction::RenameWorkspace, true) });
+    items.push(MenuItem::Submenu { label: "Open in new window".into(), items: slots(MenuAction::OpenWorkspaceInNewWindow, true) });
     items.push(MenuItem::Submenu { label: "Set hotkey".into(), items: slots(MenuAction::SetWorkspaceHotkey, true) });
     items.push(MenuItem::Submenu { label: "Delete".into(), items: slots(MenuAction::DeleteWorkspace, true) });
     items
@@ -82,6 +84,20 @@ pub(super) fn ask_hotkey(state: &AppState, slot: usize) -> Vec<Effect> {
         Some(ws) => vec![Effect::PromptHotkey { command: Command::LoadWorkspace(slot), current: ws.hotkey_chord.clone() }],
         None => vec![],
     }
+}
+
+pub(super) fn ask_rename(state: &AppState, slot: usize) -> Vec<Effect> {
+    state.workspace(slot).map(|ws| vec![Effect::PromptWorkspaceRename {
+        slot, default: display_name(ws).into(),
+    }]).unwrap_or_default()
+}
+
+/// Renaming must not replace a saved layout with the currently edited one.
+pub(super) fn rename(state: &mut AppState, slot: usize, name: &str) -> Vec<Effect> {
+    let Some(ws) = state.settings.workspaces.get_mut(slot).and_then(Option::as_mut) else { return vec![] };
+    let Some(name) = super::instance::clean_name(name) else { return vec![] };
+    ws.name = Some(name);
+    vec![Effect::SaveSettings(state.current_settings()), Effect::Repaint]
 }
 
 pub(super) fn ask_delete(state: &AppState, slot: usize) -> Vec<Effect> {

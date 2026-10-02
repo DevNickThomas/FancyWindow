@@ -22,6 +22,7 @@ unless shared).
 | Contextual editing over occupied panes | — | Toolbar or Ctrl+Alt+E; mouse and keyboard selection |
 | One-row title bar with caption buttons | #9 | Done |
 | Command palette | #10 | Done |
+| Named independent windows | #5 | File > New/Open/Rename window; saved layouts can open in a new window |
 | Activity rail, owner-drawn menus, Mica | #12 | Backlog |
 
 The report predates these decisions: default hotkeys moved from Ctrl+Win to **Win+Alt**
@@ -30,6 +31,11 @@ app icon is the Pane mark rather than the four-colour grid shown in its mockups.
 Panes now omit the extra header by default and use a contextual Edit layout overlay.
 The focus cue fills the background behind the hosted app rather than drawing an
 extra bevel outline. Current application captures are in the [main README](../../README.md).
+
+Window identity is separate from a saved layout name. The user label stays first
+in the title bar and Alt+Tab when the layout changes. File > Open window reuses an
+already-running profile; new windows get independent settings even if their names
+match. Alt+F, Alt+L, Alt+W and Alt+H expose the menus from the keyboard.
 
 ## Fidelity check against the mockups
 

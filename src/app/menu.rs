@@ -22,6 +22,11 @@ pub struct Menu {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MenuAction {
+    NewInstance,
+    RenameInstance,
+    OpenWindowPicker,
+    /// Used only by the platform's freshly built named-window picker.
+    OpenSavedInstance(usize),
     OpenSettingsFolder,
     Preferences,
     Exit,
@@ -35,6 +40,8 @@ pub enum MenuAction {
     ShowAbout,
     LoadWorkspace(usize),
     SaveWorkspace(usize),
+    RenameWorkspace(usize),
+    OpenWorkspaceInNewWindow(usize),
     SetWorkspaceHotkey(usize),
     DeleteWorkspace(usize),
     ToggleZoneHeaders,
@@ -84,6 +91,10 @@ pub fn menu_bar(state: &AppState) -> Vec<Menu> {
         Menu {
             title: "File",
             items: vec![
+                item("New window...", MenuAction::NewInstance),
+                item("Open window...", MenuAction::OpenWindowPicker),
+                item("Rename window...", MenuAction::RenameInstance),
+                MenuItem::Separator,
                 command_item(state, "Command palette...", Command::OpenPalette),
                 MenuItem::Separator,
                 item("Open settings folder", MenuAction::OpenSettingsFolder),
@@ -171,6 +182,12 @@ pub const MOUSE_GESTURES: &[(&str, &str)] = &[
 
 pub(super) fn run(state: &mut AppState, action: MenuAction) -> Vec<Effect> {
     match action {
+        MenuAction::NewInstance => super::instance::ask_new(state, None),
+        MenuAction::RenameInstance => vec![Effect::PromptWindowRename {
+            default: state.settings.window_name.clone().or_else(|| state.profile.clone()).unwrap_or_else(|| "My workspace".into()),
+        }],
+        MenuAction::OpenWindowPicker => vec![Effect::OpenWindowPicker],
+        MenuAction::OpenSavedInstance(_) => vec![],
         MenuAction::Run(command) => super::command::run(state, command),
         MenuAction::ApplyPreset(i) => apply_layout(state, (PRESETS[i].1)()),
         MenuAction::AddOuter { orientation, at_end } => {
@@ -190,6 +207,8 @@ pub(super) fn run(state: &mut AppState, action: MenuAction) -> Vec<Effect> {
         MenuAction::ShowAbout => vec![Effect::ShowAbout],
         MenuAction::LoadWorkspace(slot) => workspace::load(state, slot),
         MenuAction::SaveWorkspace(slot) => workspace::ask_name(state, slot),
+        MenuAction::RenameWorkspace(slot) => workspace::ask_rename(state, slot),
+        MenuAction::OpenWorkspaceInNewWindow(slot) => super::instance::ask_new(state, Some(slot)),
         MenuAction::SetWorkspaceHotkey(slot) => workspace::ask_hotkey(state, slot),
         MenuAction::DeleteWorkspace(slot) => workspace::ask_delete(state, slot),
         MenuAction::ToggleZoneHeaders => super::headers::toggle(state),

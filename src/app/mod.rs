@@ -6,6 +6,7 @@ mod editor;
 mod frame;
 mod headers;
 mod hotkeys;
+mod instance;
 mod menu;
 mod msg;
 mod palette;

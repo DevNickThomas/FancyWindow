@@ -62,10 +62,13 @@ impl AppState {
     pub fn status_bar(&self) -> StatusBar {
         let segment = |kind, text: String, click| Segment { kind, text, click: Some(click) };
         let workspace = self.current_workspace().and_then(|slot| self.workspace(slot)).map(|ws| display_name(ws).to_string());
-        let profile = self.profile.as_ref().map(|p| format!("Profile: {p}"));
+        let profile = self.settings.window_name.clone().or_else(|| self.profile.as_ref().map(|p| format!("Profile: {p}")));
         // Always shown, so the Workspaces menu is one click away even before the first save.
         let strong = match (workspace, profile) {
-            (Some(w), Some(p)) => format!("{w} \u{00B7} {p}"),
+            (Some(w), Some(p)) if w != p => if self.settings.window_name.is_some() {
+                format!("{p} \u{00B7} {w}")
+            } else { format!("{w} \u{00B7} {p}") },
+            (Some(w), Some(_)) => w,
             (Some(w), None) => w,
             (None, Some(p)) => p,
             (None, None) => "No workspace".into(),

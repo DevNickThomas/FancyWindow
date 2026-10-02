@@ -11,6 +11,9 @@ pub const MAX_MARGIN: i32 = 64;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
+    /// A persistent label for this window, independent of its current layout.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub window_name: Option<String>,
     pub window_margin: i32,
     pub last_layout_json: Option<String>,
     pub workspaces: Vec<Option<Workspace>>,
@@ -55,6 +58,7 @@ pub struct WindowBounds {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            window_name: None,
             window_margin: 0,
             last_layout_json: None,
             workspaces: vec![None; WORKSPACE_SLOTS],

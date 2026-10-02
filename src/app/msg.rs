@@ -19,6 +19,9 @@ pub enum Msg {
     Menu(MenuAction),
     /// The name prompt for saving a workspace was confirmed; `saved_at_utc` is ISO-8601.
     WorkspaceNamed { slot: usize, name: String, saved_at_utc: String },
+    WorkspaceRenamed { slot: usize, name: String },
+    NewWindowNamed { name: String, workspace: Option<usize> },
+    WindowRenamed(String),
     /// A chord was chosen for a command; `None` clears it.
     SetHotkey { command: Command, chord: Option<Chord> },
     /// Windows would not register the chord just assigned.
@@ -97,6 +100,11 @@ pub enum Effect {
     Exit,
     /// Ask for a workspace name; reply with `Msg::WorkspaceNamed`.
     PromptWorkspaceName { slot: usize, default: String },
+    PromptWorkspaceRename { slot: usize, default: String },
+    PromptNewWindow { workspace: Option<usize>, default: String },
+    PromptWindowRename { default: String },
+    LaunchInstance(Settings),
+    OpenWindowPicker,
     /// Capture a chord; reply with `Msg::SetHotkey`.
     PromptHotkey { command: Command, current: Option<String> },
     /// Ask before deleting; reply with `Msg::WorkspaceDeleteConfirmed`.

@@ -1,8 +1,12 @@
 # Fancy Window
 
-Arrange desktop applications inside one resizable workspace on Windows 10/11.
-Drop windows into panes, split the pane you are working in, and save layouts you
-can return to with a shortcut.
+Keep your coding agents visible and your hands on the keyboard. Fancy Window
+organises separate terminal windows into one resizable workspace on Windows 10/11:
+two Codex CLI sessions, two Claude Code sessions, or whatever tools your project needs.
+
+Switch to the next terminal with **Win+Alt+]**, go back with **Win+Alt+[**, and carry
+on typing. The background tint follows focus, so you can see exactly which session
+will receive your next command. No hunting through overlapping terminal windows.
 
 ![Fancy Window running with real desktop applications](docs/screenshot.png)
 
@@ -84,11 +88,40 @@ apply immediately. Each hosted app keeps its own theme.
 
 ## Workspaces and command palette
 
+### Name your windows by project or agent
+
+Use **File > New window** to create another independent Fancy Window and give it a
+name, such as **Claude · Project A** or **Codex · Project B**. The name appears first
+in the title bar and in Alt+Tab, and stays there when you split or resize panes.
+**File > Rename window** changes it without moving its settings or replacing its layout.
+
+**File > Open window** reopens a saved named window with its last layout, theme and
+preferences. If that window is already running, it is brought forward. Separate
+windows use separate settings files, including when their display names match.
+New windows open on the next monitor when available, or cascade on the same screen.
+Keep their canvases separate when attaching windows; overlapping-instance drops
+still have the limitation tracked in [issue #3](https://github.com/DevNickThomas/FancyWindow/issues/3).
+
+Focus cycling continues across Fancy Window instances, so project groups can live
+on different monitors without needing the mouse to move between their terminals.
+
+### Save and reuse pane layouts
+
 Use **Workspaces > Save current as** to name a layout. Pick its name in that menu
 to load it, or use **Workspaces > Set hotkey** to assign a shortcut. Workspaces save
 pane arrangements, not application sessions: they do not launch apps or restore
 documents. Loading a layout moves already hosted windows into its panes in reading
 order; windows that no longer fit are released.
+
+**Workspaces > Rename** changes a saved layout's name while keeping its geometry and
+shortcut. **Workspaces > Open in new window** starts a separate named window from
+that saved layout. It does not move or duplicate the current window's running agents.
+
+### Manage the workspace from the keyboard
+
+When Fancy Window itself has focus, **Alt+F / Alt+W / Alt+L / Alt+H** open File,
+Workspaces, Layout and Help. Use arrows and Enter to choose a command. Global
+shortcuts such as **Ctrl+Alt+E** and **Win+Alt+Space** work while a hosted app has focus.
 
 Click the search box in the title bar, choose **File > Command palette**, or press
 **Win+Alt+Space**. Type to filter layouts, saved workspaces and commands, use the
@@ -114,6 +147,7 @@ currently releases all hosted windows as well as resetting the layout.
 | Default chord | Action |
 | --- | --- |
 | **Ctrl+Alt+E** | Open/finish contextual layout editing |
+| **Alt+F / Alt+W / Alt+L / Alt+H** | Open a menu when Fancy Window has focus |
 | **Win+Alt+] / Win+Alt+[** | Focus next/previous hosted window, across instances |
 | **Win+Alt+PageDown** | Send Fancy Window behind other windows and keep it there |
 | **Win+Alt+PageUp** | Bring Fancy Window forward |
@@ -131,6 +165,10 @@ are retained between launches.
 
 Run `FancyWindow.exe --profile work` for a separate set of saved layouts and
 preferences. Multiple instances can have different profiles.
+
+Names and saved layouts live beside the executable, so keep using the same portable
+folder to reopen them. See the [named-window QA record](docs/qa/2026-10-02-named-windows.md)
+for the tested create, rename and reopen workflows.
 
 | File beside the executable | Purpose |
 | --- | --- |

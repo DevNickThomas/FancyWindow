@@ -20,7 +20,7 @@ use std::path::PathBuf;
 
 use super::preferences::{self, Change};
 use super::shortcuts::{self, Request, Row, Status};
-use super::{chrome, dialogs, host, hotkeys, indicator, input, layout_editor, menus, palette, placement, storage};
+use super::{chrome, dialogs, host, hotkeys, indicator, input, instances, layout_editor, menus, palette, placement, storage};
 use crate::app::{AppState, CONFIGURABLE, Command, CursorKind, Effect, Frame, MenuAction, Msg, StatusBar, StatusClick, WindowId, menu_bar, update, zone_menu};
 use crate::model::{Chord, Point, Settings, ZoneId, crash_log_name};
 use crate::view::{self, CaptionButton, Theme, TitleChrome, TitleHit, theme_of};
@@ -48,11 +48,14 @@ struct Shell {
 
 /// Creates the main window and runs the message loop until it closes.
 pub fn run(state: AppState, settings_path: PathBuf) -> Result<()> {
+    if instances::focus_existing(&settings_path) { return Ok(()); }
+    let Some(_profile_guard) = instances::claim(&settings_path)? else { return Ok(()) };
     unsafe {
         CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok()?;
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)?;
         let maximized = state.settings.window_maximized;
         let hwnd = create_window(state, settings_path)?;
+        with_shell(hwnd, |s| instances::mark(hwnd, &s.settings_path));
         MAIN.set(hwnd);
         // Re-run WM_NCCALCSIZE now that the shell is attached, so the caption goes at once.
         let _ = SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
@@ -151,6 +154,7 @@ extern "system" fn wndproc(hwnd: HWND, message: u32, wparam: WPARAM, lparam: LPA
                 let _ = DestroyWindow(hwnd);
             }
             WM_DESTROY => {
+                with_shell(hwnd, |s| instances::unmark(hwnd, &s.settings_path));
                 hotkeys::uninstall(hwnd);
                 indicator::hide();
                 PostQuitMessage(0);
@@ -159,6 +163,21 @@ extern "system" fn wndproc(hwnd: HWND, message: u32, wparam: WPARAM, lparam: LPA
                 if let Some(msg) = hotkeys::on_hotkey(hwnd, wparam.0 as i32) {
                     dispatch(hwnd, msg);
                 }
+            }
+            // Local access keys keep window/workspace management usable without
+            // a mouse; global shortcuts continue to work from hosted apps.
+            WM_SYSKEYDOWN if GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000 == 0 => {
+                let title = match wparam.0 as u8 {
+                    b'F' => Some("File"), b'L' => Some("Layout"),
+                    b'W' => Some("Workspaces"), b'H' => Some("Help"), _ => None,
+                };
+                if let Some(title) = title {
+                    if let Some(i) = with_shell(hwnd, |s| menu_bar(&s.state).iter().position(|m| m.title == title)) {
+                        open_bar_menu(hwnd, title_layout(hwnd).menus[i].x);
+                    }
+                    return LRESULT(0);
+                }
+                return DefWindowProcW(hwnd, message, wparam, lparam);
             }
             WM_COPYDATA => match hotkeys::on_copydata(hwnd, lparam) {
                 Some(msg) => {
@@ -269,6 +288,8 @@ fn run_effect(hwnd: HWND, effect: Effect) {
     unsafe {
         match effect {
             Effect::Repaint => {
+                let title = with_shell(hwnd, |s| s.state.title());
+                let _ = SetWindowTextW(hwnd, &HSTRING::from(title));
                 let _ = InvalidateRect(Some(hwnd), None, false);
             }
             Effect::CaptureMouse => {
@@ -316,6 +337,23 @@ fn run_effect(hwnd: HWND, effect: Effect) {
                     dispatch(hwnd, Msg::WorkspaceNamed { slot, name, saved_at_utc: utc_now() });
                 }
             }
+            Effect::PromptWorkspaceRename { slot, default } => {
+                if let Some(name) = dialogs::prompt_text(hwnd, theme(hwnd), "Rename workspace", "Workspace name:", &default) {
+                    dispatch(hwnd, Msg::WorkspaceRenamed { slot, name });
+                }
+            }
+            Effect::PromptNewWindow { workspace, default } => {
+                if let Some(name) = dialogs::prompt_text(hwnd, theme(hwnd), "New window", "Window name:", &default) {
+                    dispatch(hwnd, Msg::NewWindowNamed { name, workspace });
+                }
+            }
+            Effect::PromptWindowRename { default } => {
+                if let Some(name) = dialogs::prompt_text(hwnd, theme(hwnd), "Rename window", "Window name:", &default) {
+                    dispatch(hwnd, Msg::WindowRenamed(name));
+                }
+            }
+            Effect::LaunchInstance(settings) => instances::create(hwnd, settings),
+            Effect::OpenWindowPicker => instances::pick(hwnd),
             Effect::PromptHotkey { command, current } => {
                 let title = format!("Hotkey: {}", command.label());
                 let current = current.as_deref().and_then(Chord::parse);

@@ -247,11 +247,7 @@ fn draw_title_bar(hdc: HDC, client: Rect, state: &AppState, theme: &Theme, title
     }
 
     if let Some(centre) = layout.centre {
-        let workspace = state.current_workspace().and_then(|slot| state.workspace(slot)).and_then(|ws| ws.name.clone());
-        let label = match workspace {
-            Some(name) => format!("{} \u{2014} {name}", state.title()),
-            None => state.title(),
-        };
+        let label = state.centre_title();
         gdi::rounded(hdc, centre, theme.window_bg, theme.divider, (6.0 * scale).round() as i32);
         // A search glyph says "click to search", as VS Code's command center does.
         let font = (STATUS_FONT * scale).round() as i32;

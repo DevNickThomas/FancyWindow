@@ -7,6 +7,7 @@ mod dialogs;
 mod layout_editor;
 mod hotkeys;
 mod indicator;
+mod instances;
 mod input;
 mod menus;
 mod palette;

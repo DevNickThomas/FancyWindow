@@ -150,9 +150,21 @@ impl AppState {
     }
 
     pub fn title(&self) -> String {
+        if let Some(name) = self.settings.window_name.as_deref().filter(|n| !n.trim().is_empty()) {
+            return format!("{name} \u{2014} Fancy Window");
+        }
         match &self.profile {
             Some(p) => format!("Fancy Window [{p}]"),
             None => "Fancy Window".into(),
+        }
+    }
+
+    /// Put the user's label first, so the useful part survives title-bar truncation.
+    pub fn centre_title(&self) -> String {
+        let window = self.settings.window_name.clone().unwrap_or_else(|| self.title());
+        match self.current_workspace().and_then(|s| self.workspace(s)).and_then(|ws| ws.name.as_ref()) {
+            Some(layout) if layout != &window => format!("{window} \u{00B7} {layout}"),
+            _ => window,
         }
     }
 }
