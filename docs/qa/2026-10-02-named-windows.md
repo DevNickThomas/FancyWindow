@@ -43,3 +43,13 @@ hosting, cross-instance focus cycling or drag-in/out compatibility. The earlier
 
 Named windows restore layout and preferences. They do not automatically start
 terminals, resume agent sessions or restore application documents.
+
+## Restart follow-up
+
+After a machine restart, reopening the `terminal-demo` profile restored the
+`Coding agents - FancyWindow` name, four-pane layout and Dark Modern theme. Both
+CLI sign-ins persisted, and two Codex CLI and two Claude Code processes relaunched.
+The host still had zero attached windows; terminal attachment and screenshots
+were not completed by this restart check. The repeatable
+[terminal acceptance stories](../../scripts/ui-test/terminal-workspaces.md)
+describe the remaining test pass.

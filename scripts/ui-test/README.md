@@ -35,3 +35,14 @@ compiles this small helper (`Add-Type`) for SendInput, window lookup and screens
 - S12 (merge) and S18 (workspace menu) are screenshot-only checks.
 - The cycle story never presses "next" on the last window while another instance
   runs, because that hands focus to the other instance.
+
+## Current preview and real terminals
+
+The S01–S20 script uses disposable test windows. It does not establish that modern
+terminal apps render correctly, or cover the contextual editor and named-window
+workflows. Follow [Terminal and named-window stories](terminal-workspaces.md) for
+those checks. Keep manual results separate from the script's PASS/FAIL output.
+
+The latest recorded results are in [preview QA](../../docs/qa/2026-10-02.md) and
+[named-window QA](../../docs/qa/2026-10-02-named-windows.md). Their coverage limits
+remain open until a subsequent run records evidence.
