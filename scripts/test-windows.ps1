@@ -20,4 +20,7 @@ $l = New-Object System.Windows.Forms.Label
 $l.Text = $f.Text; $l.AutoSize = $true; $l.Left = 16; $l.Top = 16
 $l.Font = New-Object System.Drawing.Font('Segoe UI', 18)
 $f.Controls.Add($l)
+# -WindowStyle Hidden applies to this process's first shown window, which is the form
+# (the console belongs to conhost). Spend it on a throwaway show, then show for real.
+$f.Show(); $f.Hide()
 [System.Windows.Forms.Application]::Run($f)
