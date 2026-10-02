@@ -82,7 +82,8 @@ cargo build --release      # target\release\fancy-window.exe
 After changing dependencies, run `scripts/third-party-notices.sh` to refresh
 `THIRD-PARTY-NOTICES.txt`, which ships in the zip.
 
-`scripts\test-windows.ps1` opens throwaway windows for trying Alt+drag safely.
+`scripts\test-windows.ps1` opens throwaway windows for trying Alt+drag safely, and
+`scripts\ui-test\` runs the user stories end to end against them (see its README).
 
 ## Licence
 
