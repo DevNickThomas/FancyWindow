@@ -8,7 +8,7 @@ use crate::model::{Chord, MOD_ALT, MOD_WIN, WORKSPACE_SLOTS};
 use super::{AppState, Command, Effect};
 
 /// The built-in commands, in the order the shortcuts dialog lists them.
-pub const CONFIGURABLE: [Command; 7] = [
+pub const CONFIGURABLE: [Command; 8] = [
     Command::CycleNext,
     Command::CyclePrevious,
     Command::SendToBack,
@@ -16,6 +16,7 @@ pub const CONFIGURABLE: [Command; 7] = [
     Command::MarginUp,
     Command::MarginDown,
     Command::ResetLayout,
+    Command::OpenPalette,
 ];
 
 impl Command {
@@ -29,6 +30,7 @@ impl Command {
             Command::ResetLayout => "resetLayout",
             Command::CycleNext => "cycleNext",
             Command::CyclePrevious => "cyclePrevious",
+            Command::OpenPalette => "openPalette",
             Command::LoadWorkspace(_) => "loadWorkspace",
         }
     }
@@ -42,6 +44,7 @@ impl Command {
             Command::ResetLayout => "Reset to 2\u{00D7}2".into(),
             Command::CycleNext => "Focus next hosted window".into(),
             Command::CyclePrevious => "Focus previous hosted window".into(),
+            Command::OpenPalette => "Open command palette".into(),
             Command::LoadWorkspace(slot) => format!("Load workspace {}", slot + 1),
         }
     }
@@ -58,6 +61,7 @@ impl Command {
             Command::ResetLayout => win_alt(0x24),   // Home
             Command::CycleNext => win_alt(0xDD),     // ]
             Command::CyclePrevious => win_alt(0xDB), // [
+            Command::OpenPalette => win_alt(0x20),   // Space
             Command::LoadWorkspace(_) => None,
         }
     }

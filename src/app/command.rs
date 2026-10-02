@@ -17,6 +17,8 @@ pub enum Command {
     ResetLayout,
     CycleNext,
     CyclePrevious,
+    /// Open the command palette.
+    OpenPalette,
     /// A workspace hotkey.
     LoadWorkspace(usize),
 }
@@ -53,6 +55,7 @@ pub(super) fn run(state: &mut AppState, command: Command) -> Vec<Effect> {
         }
         // Cycling needs to know about other instances; the platform asks with `Msg::Cycle`.
         Command::CycleNext | Command::CyclePrevious => vec![],
+        Command::OpenPalette => vec![Effect::ShowPalette],
         Command::LoadWorkspace(slot) => super::workspace::load(state, slot),
     }
 }

@@ -27,9 +27,10 @@ fn defaults_use_win_alt_and_leave_ctrl_win_free() {
             (Command::MarginUp, "Win+Alt+=".into()),
             (Command::MarginDown, "Win+Alt+-".into()),
             (Command::ResetLayout, "Win+Alt+Home".into()),
+            (Command::OpenPalette, "Win+Alt+Space".into()),
         ]
     );
-    assert_eq!(state.hotkey_bindings().len(), 7);
+    assert_eq!(state.hotkey_bindings().len(), 8);
 }
 
 #[test]

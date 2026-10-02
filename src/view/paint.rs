@@ -201,7 +201,15 @@ fn draw_title_bar(hdc: HDC, client: Rect, state: &AppState, theme: &Theme, title
             None => state.title(),
         };
         gdi::rounded(hdc, centre, theme.window_bg, theme.divider, (6.0 * scale).round() as i32);
-        gdi::text(hdc, centre, &label, theme.muted, (STATUS_FONT * scale).round() as i32, Align::Center);
+        // A search glyph says "click to search", as VS Code's command center does.
+        let font = (STATUS_FONT * scale).round() as i32;
+        let gap = (6.0 * scale).round();
+        let glyph = (12.0 * scale).round();
+        let width = gdi::text_width(hdc, &label, font) as f64 + glyph + gap;
+        let x = (centre.x + (centre.width - width) / 2.0).max(centre.x + gap);
+        gdi::glyph(hdc, Rect::new(x, centre.y, glyph, centre.height), '\u{E721}', theme.muted, (11.0 * scale).round() as i32);
+        let text = Rect::new(x + glyph + gap, centre.y, (centre.right() - gap - x - glyph - gap).max(0.0), centre.height);
+        gdi::text(hdc, text, &label, theme.muted, font, Align::Left);
     }
 
     let glyph_size = (CAPTION_GLYPH * scale).round() as i32;

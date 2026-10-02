@@ -20,7 +20,7 @@ use std::path::PathBuf;
 
 use super::preferences::{self, Change};
 use super::shortcuts::{self, Request, Row, Status};
-use super::{chrome, dialogs, host, hotkeys, indicator, input, menus, placement, storage};
+use super::{chrome, dialogs, host, hotkeys, indicator, input, menus, palette, placement, storage};
 use crate::app::{AppState, CONFIGURABLE, Command, CursorKind, Effect, Frame, MenuAction, Msg, WindowId, menu_bar, update, zone_menu};
 use crate::model::{Chord, Point, Rect, Settings, ZoneId, crash_log_name};
 use crate::view::{self, CaptionButton, Theme, TitleChrome, TitleHit, theme_of};
@@ -225,7 +225,12 @@ extern "system" fn wndproc(hwnd: HWND, message: u32, wparam: WPARAM, lparam: LPA
                 view::paint(hwnd, &s.state, &titles, &chrome, &s.icons);
             }),
             WM_LBUTTONDOWN if (lparam.0 >> 16) as i16 as f64 <= view::canvas_top_px(scale(hwnd)) => {
-                open_bar_menu(hwnd, (lparam.0 & 0xFFFF) as i16 as f64);
+                let (x, y) = ((lparam.0 & 0xFFFF) as i16 as f64, (lparam.0 >> 16) as i16 as f64);
+                if title_layout(hwnd).centre.is_some_and(|c| c.contains(Point::new(x, y))) {
+                    dispatch(hwnd, Msg::Menu(MenuAction::OpenPalette));
+                } else {
+                    open_bar_menu(hwnd, x);
+                }
             }
             WM_LBUTTONDOWN if on_status_help(hwnd, lparam) => dispatch(hwnd, Msg::Menu(MenuAction::ShowShortcuts)),
             WM_ERASEBKGND => return LRESULT(1),
@@ -331,6 +336,12 @@ This cannot be undone.", slot + 1);
             }
             Effect::ShowWarning { title, text } => dialogs::warn(hwnd, &title, &text),
             Effect::ShowPreferences => show_preferences(hwnd),
+            Effect::ShowPalette => {
+                let entries = with_shell(hwnd, |s| s.state.palette_entries());
+                if let Some(action) = palette::show(hwnd, theme(hwnd), entries) {
+                    dispatch(hwnd, Msg::Menu(action));
+                }
+            }
             Effect::ApplyTheme => apply_theme(hwnd),
             Effect::Exit => {
                 let _ = PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0));
@@ -515,7 +526,7 @@ fn nc_hit_test(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     let maximized = unsafe { IsZoomed(hwnd).as_bool() };
     let hit = title_layout(hwnd).hit(Point::new(p.x as f64, p.y as f64), frame_thickness(hwnd) as f64, maximized);
     let code = match hit {
-        None | Some(TitleHit::Menu(_)) => HTCLIENT,
+        None | Some(TitleHit::Menu(_) | TitleHit::Centre) => HTCLIENT,
         Some(TitleHit::SystemMenu) => HTSYSMENU,
         Some(TitleHit::Caption) => HTCAPTION,
         Some(TitleHit::Button(CaptionButton::Minimize)) => HTMINBUTTON,

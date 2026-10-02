@@ -8,6 +8,7 @@ mod hotkeys;
 mod indicator;
 mod input;
 mod menus;
+mod palette;
 mod placement;
 mod preferences;
 mod shortcuts;

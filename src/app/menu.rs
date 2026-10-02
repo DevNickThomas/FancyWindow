@@ -38,6 +38,8 @@ pub enum MenuAction {
     SetWorkspaceHotkey(usize),
     DeleteWorkspace(usize),
     ToggleZoneHeaders,
+    /// The title bar's centre box: open the command palette.
+    OpenPalette,
 }
 
 /// Builds a preset layout with fresh zone ids.
@@ -82,6 +84,8 @@ pub fn menu_bar(state: &AppState) -> Vec<Menu> {
         Menu {
             title: "File",
             items: vec![
+                command_item(state, "Command palette...", Command::OpenPalette),
+                MenuItem::Separator,
                 item("Open settings folder", MenuAction::OpenSettingsFolder),
                 MenuItem::Separator,
                 item("Preferences...", MenuAction::Preferences),
@@ -187,6 +191,7 @@ pub(super) fn run(state: &mut AppState, action: MenuAction) -> Vec<Effect> {
         MenuAction::SetWorkspaceHotkey(slot) => workspace::ask_hotkey(state, slot),
         MenuAction::DeleteWorkspace(slot) => workspace::ask_delete(state, slot),
         MenuAction::ToggleZoneHeaders => super::headers::toggle(state),
+        MenuAction::OpenPalette => vec![Effect::ShowPalette],
     }
 }
 

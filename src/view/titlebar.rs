@@ -32,6 +32,8 @@ pub enum TitleHit {
     /// The app icon: the window menu.
     SystemMenu,
     Menu(usize),
+    /// The centre box: opens the command palette.
+    Centre,
     Button(CaptionButton),
     /// Drag to move, double-click to maximise.
     Caption,
@@ -112,6 +114,9 @@ impl TitleLayout {
         }
         if let Some(i) = self.menus.iter().position(|r| r.contains(p)) {
             return Some(TitleHit::Menu(i));
+        }
+        if self.centre.is_some_and(|c| c.contains(p)) {
+            return Some(TitleHit::Centre);
         }
         // The whole strip left of the menus, not just the 16 px glyph.
         if p.x < self.menus.first().map_or(self.icon.right(), |m| m.x) {

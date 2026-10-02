@@ -40,6 +40,7 @@ then try key combinations. Each one is checked as you press it: **Available**,
 | `Win+Alt+]` / `[` | Focus the next / previous hosted window, across instances |
 | `Win+Alt+=` / `-` | Increase / decrease the hosted-window margin |
 | `Win+Alt+Home` | Reset to a 2x2 grid |
+| `Win+Alt+Space` | Command palette: every layout, workspace and command, filtered as you type (also **File > Command palette**, or click the box in the title bar) |
 
 Defaults avoid `Ctrl+Win`, which many other tools use. `Win+Alt+B` and `Win+Alt+R`
 belong to Windows (HDR toggle, Game Bar recording), hence PageUp/PageDown and Home.

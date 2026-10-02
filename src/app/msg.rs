@@ -105,6 +105,8 @@ pub enum Effect {
     BindHotkey { command: Command, chord: Option<Chord> },
     ShowWarning { title: String, text: String },
     ShowPreferences,
+    /// Open the command palette; a pick comes back as `Msg::Menu`.
+    ShowPalette,
     /// The theme changed: recolour title bars, menus and the reminder.
     ApplyTheme,
 }

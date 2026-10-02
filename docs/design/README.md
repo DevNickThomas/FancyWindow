@@ -20,7 +20,7 @@ unless shared).
 | Live accent status bar | — | Done; clickable segments in #11 |
 | Zone headers (icon, title, number, ×) | #8 | Done |
 | One-row title bar with caption buttons | #9 | Done |
-| Command palette | #10 | In progress |
+| Command palette | #10 | Done |
 | Activity rail, owner-drawn menus, Mica | #12 | Backlog |
 
 The report predates two decisions: default hotkeys moved from Ctrl+Win to **Win+Alt**

@@ -47,7 +47,11 @@ fn hit_testing() {
     let hit = |x: f64, y: f64| l.hit(Point::new(x, y), 6.0, false);
     assert_eq!(hit(20.0, 16.0), Some(TitleHit::SystemMenu));
     assert_eq!(hit(50.0, 16.0), Some(TitleHit::Menu(0)));
-    assert_eq!(hit(600.0, 16.0), Some(TitleHit::Caption));
+    // Between the menus and the centre box is caption; the box itself opens the palette.
+    assert_eq!(hit(300.0, 16.0), Some(TitleHit::Caption));
+    assert_eq!(hit(600.0, 16.0), Some(TitleHit::Centre));
+    // Above and below the box (it is 22 px tall in a 32 px row) is still caption.
+    assert_eq!(hit(600.0, 30.0), Some(TitleHit::Caption));
     assert_eq!(hit(1120.0, 16.0), Some(TitleHit::Button(CaptionButton::Maximize)));
     assert_eq!(hit(1190.0, 16.0), Some(TitleHit::Button(CaptionButton::Close)));
     assert_eq!(hit(600.0, 40.0), None);
