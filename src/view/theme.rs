@@ -76,6 +76,9 @@ macro_rules! preset {
 
 /// In the order the Preferences dialog lists them; the first is the default.
 pub const PRESETS: &[Preset] = &[
+    // The approved restyle's palettes (docs/design/restyle-report.html), VS Code's defaults.
+    preset!("Dark Modern", 0x1F1F1F, 0x181818, 0x222222, 0x2B2B2B, 0xCCCCCC, 0x9D9D9D, 0x2B2B2B, 0x2B2B2B, 0xFFFFFF),
+    preset!("Light Modern", 0xFFFFFF, 0xF8F8F8, 0xFFFFFF, 0xE5E5E5, 0x3B3B3B, 0x6E6E6E, 0xE5E5E5, 0xE5E5E5, 0xFFFFFF),
     preset!("Dark", 0x1E1E1E, 0x2D2D30, 0x252526, 0x3F3F46, 0xCCCCCC, 0x9B9B9B, 0x3F3F46, 0x3F3F46, 0xFFFFFF),
     preset!("Dark Dimmed", 0x1C2128, 0x22272E, 0x2D333B, 0x444C56, 0xADBAC7, 0x768390, 0x444C56, 0x444C56, 0xFFFFFF),
     preset!("High Contrast", 0x000000, 0x0D0D0D, 0x0D0D0D, 0x808080, 0xFFFFFF, 0xBFBFBF, 0x7F7F7F, 0x7F7F7F, 0xFFFFFF),
@@ -90,6 +93,7 @@ pub const DEFAULT_ACCENT: Color = rgb(0x007ACC);
 const WHITE: Color = rgb(0xFFFFFF);
 /// Accent strength behind the focused window, against 0x33/255 (20%) for the other zones.
 const ACTIVE_GLOW_ALPHA: f64 = 0.45;
+const ACTIVE_GLOW_ALPHA_LIGHT: f64 = 0.28;
 
 /// Accent swatches offered in Preferences.
 pub const ACCENT_SWATCHES: [Color; 8] =
@@ -142,7 +146,8 @@ impl Theme {
             muted: p.muted,
             active_bg: accent.darken(0.45),
             active_text: p.active_text,
-            active_glow: accent.over(p.window_bg, ACTIVE_GLOW_ALPHA),
+            // The report: 45% on dark themes, 28% on light ones so it still reads on white.
+            active_glow: accent.over(p.window_bg, if p.window_bg.is_light() { ACTIVE_GLOW_ALPHA_LIGHT } else { ACTIVE_GLOW_ALPHA }),
             // Lifted toward white on dark themes; on light ones a touch darker so it still shows.
             active_bevel: if p.window_bg.is_light() { accent.darken(0.15) } else { WHITE.over(accent, 0.35) },
             status_bg: accent,
@@ -155,7 +160,7 @@ impl Theme {
     }
 
     pub fn dark() -> Self {
-        Self::new("Dark", &DEFAULT_ACCENT.hex())
+        Self::new(PRESETS[0].name, &DEFAULT_ACCENT.hex())
     }
 
     pub fn is_light(&self) -> bool {

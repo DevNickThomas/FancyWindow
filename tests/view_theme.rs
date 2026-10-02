@@ -11,9 +11,9 @@ fn parses_hex_colours() {
 }
 
 #[test]
-fn eight_presets_with_original_names() {
+fn modern_presets_first_then_the_originals() {
     let names: Vec<&str> = PRESETS.iter().map(|p| p.name).collect();
-    assert_eq!(names, ["Dark", "Dark Dimmed", "High Contrast", "Light", "GitHub Light", "Solarized Light", "Solarized Dark", "Monokai"]);
+    assert_eq!(names, ["Dark Modern", "Light Modern", "Dark", "Dark Dimmed", "High Contrast", "Light", "GitHub Light", "Solarized Light", "Solarized Dark", "Monokai"]);
     assert_eq!(ACCENT_SWATCHES.len(), 8);
 }
 
@@ -65,4 +65,18 @@ fn key_chips_match_the_mockup_greys() {
     assert_eq!(Theme::new("Dark", "#007ACC").kbd_bg, Color(0x33, 0x33, 0x33));
     let light = Theme::new("Light", "#007ACC").kbd_bg;
     assert!((0xEA..=0xEE).contains(&light.0), "{light:?}");
+}
+
+#[test]
+fn dark_modern_is_the_mockup_palette_and_the_default() {
+    let t = Theme::new("Dark Modern", "#007ACC");
+    assert_eq!((t.window_bg, t.bar_bg, t.divider), (Color(0x1F, 0x1F, 0x1F), Color(0x18, 0x18, 0x18), Color(0x2B, 0x2B, 0x2B)));
+    assert_eq!(Theme::dark(), t);
+    assert_eq!(fancy_window::model::Settings::default().theme_name, "Dark Modern");
+}
+
+#[test]
+fn light_themes_glow_at_28_percent() {
+    // 28% of #007ACC over white, as the report specifies, against 45% on dark themes.
+    assert_eq!(Theme::new("Light Modern", "#007ACC").active_glow, Color(0xB8, 0xDA, 0xF1));
 }

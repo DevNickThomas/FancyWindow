@@ -224,7 +224,8 @@ Run S01 'Launches with a 2x2 grid, profile title and status bar' {
     Shot 'S01-launch'
     $c = Canvas
     $zone = [UI]::Pixel(($c[0] + $c[2] / 4), ($c[1] + $c[3] / 4))
-    Check 'zones are painted with the accent tint' ($zone -eq '#183041') $zone
+    # Empty zones show the canvas (Dark Modern #1F1F1F) inside a dashed outline.
+    Check 'empty zones show the canvas background' ($zone -eq '#1F1F1F') $zone
     $cl = [UI]::Client($script:FW)
     $bar = [UI]::Pixel(($cl[0] + [int]($cl[2] * 0.6)), ($cl[1] + $cl[3] - 4))
     Check 'status bar is the accent colour' ($bar -eq '#007ACC') $bar

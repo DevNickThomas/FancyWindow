@@ -16,7 +16,6 @@ pub enum Change {
 }
 
 const WIDTH: f64 = 460.0;
-const HEIGHT: f64 = 500.0;
 const ROW_ID: usize = 100;
 const SWATCH_ID: usize = 200;
 const APPLY_HEX: usize = 300;
@@ -25,7 +24,9 @@ const SWATCH: f64 = 44.0;
 
 /// Shows Preferences. `apply` carries each change out and returns the resulting theme.
 pub fn show(owner: HWND, theme: Theme, theme_name: &str, accent: &str, mut apply: impl FnMut(Change) -> Theme) {
-    let dialog = Dialog::new(owner, theme, "Preferences", WIDTH, HEIGHT);
+    // Tall enough for every preset row, the swatches and the custom colour.
+    let height = 36.0 + PRESETS.len() as f64 * ROW_HEIGHT + 8.0 + 24.0 + SWATCH + 10.0 + 26.0 + 60.0;
+    let dialog = Dialog::new(owner, theme, "Preferences", WIDTH, height);
     let mut selected_theme = PRESETS.iter().position(|p| p.name.eq_ignore_ascii_case(theme_name)).unwrap_or(0);
     let mut accent = Color::parse(accent).unwrap_or(theme.accent);
 
@@ -44,7 +45,7 @@ pub fn show(owner: HWND, theme: Theme, theme_name: &str, accent: &str, mut apply
     dialog.label("Custom", (16.0, custom_top + 4.0, 60.0, 22.0));
     let hex = dialog.control(w!("EDIT"), &accent.hex(), WS_BORDER | WS_TABSTOP, (80.0, custom_top, 110.0, 26.0), 0);
     dialog.button("Apply", APPLY_HEX, (198.0, custom_top - 1.0), (86.0, 28.0), Look::Push { primary: false });
-    dialog.button("Close", OK, (WIDTH - 102.0, HEIGHT - 44.0), (86.0, 28.0), Look::Push { primary: true });
+    dialog.button("Close", OK, (WIDTH - 102.0, height - 44.0), (86.0, 28.0), Look::Push { primary: true });
 
     loop {
         let pressed = dialog.run(|msg| {

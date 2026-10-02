@@ -58,7 +58,7 @@ impl Default for Settings {
             window_margin: 0,
             last_layout_json: None,
             workspaces: vec![None; WORKSPACE_SLOTS],
-            theme_name: "Dark".into(),
+            theme_name: "Dark Modern".into(),
             accent_color: "#007ACC".into(),
             window_width: None,
             window_height: None,

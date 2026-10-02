@@ -3,7 +3,7 @@
 //!
 //!   cargo run --release --example render -- <out-dir>
 //!
-//! Writes dark.bmp and light.bmp: the report's hero scene (1100 x 660, "Big left,
+//! Writes dark.bmp and light.bmp (Dark Modern / Light Modern): the report's hero scene (1100 x 660, "Big left,
 //! stacked right", workspace "Coding", two hosted windows and one empty zone).
 
 use std::collections::HashMap;
@@ -38,7 +38,7 @@ fn scene(theme: &str) -> AppState {
 fn main() {
     let out = PathBuf::from(std::env::args().nth(1).unwrap_or_else(|| ".".into()));
     std::fs::create_dir_all(&out).expect("output folder");
-    for (theme, file) in [("Dark", "dark.bmp"), ("Light", "light.bmp")] {
+    for (theme, file) in [("Dark Modern", "dark.bmp"), ("Light Modern", "light.bmp")] {
         let state = scene(theme);
         let titles: Vec<&str> = menu_bar(&state).iter().map(|m| m.title).collect();
         let chrome = TitleChrome { active: true, ..Default::default() };
