@@ -3,12 +3,12 @@
 //! Built-in chords can be changed or cleared; changes are stored by command
 //! name in `settings.hotkeys`. Workspace chords live on their workspace.
 
-use crate::model::{Chord, MOD_CONTROL, MOD_WIN, WORKSPACE_SLOTS};
+use crate::model::{Chord, MOD_ALT, MOD_WIN, WORKSPACE_SLOTS};
 
 use super::{AppState, Command, Effect};
 
 /// The built-in commands, in the order the shortcuts dialog lists them.
-pub const CONFIGURABLE: [Command; 7] = [
+pub const CONFIGURABLE: [Command; 8] = [
     Command::CycleNext,
     Command::CyclePrevious,
     Command::SendToBack,
@@ -16,6 +16,7 @@ pub const CONFIGURABLE: [Command; 7] = [
     Command::MarginUp,
     Command::MarginDown,
     Command::ResetLayout,
+    Command::OpenPalette,
 ];
 
 impl Command {
@@ -29,6 +30,7 @@ impl Command {
             Command::ResetLayout => "resetLayout",
             Command::CycleNext => "cycleNext",
             Command::CyclePrevious => "cyclePrevious",
+            Command::OpenPalette => "openPalette",
             Command::LoadWorkspace(_) => "loadWorkspace",
         }
     }
@@ -42,20 +44,24 @@ impl Command {
             Command::ResetLayout => "Reset to 2\u{00D7}2".into(),
             Command::CycleNext => "Focus next hosted window".into(),
             Command::CyclePrevious => "Focus previous hosted window".into(),
+            Command::OpenPalette => "Open command palette".into(),
             Command::LoadWorkspace(slot) => format!("Load workspace {}", slot + 1),
         }
     }
 
+    /// Win+Alt, leaving Ctrl+Win to other apps. Win+Alt+B (HDR) and Win+Alt+R (Game Bar
+    /// recording) belong to Windows, hence PageUp/PageDown and Home for those commands.
     pub fn default_chord(self) -> Option<Chord> {
-        let ctrl_win = |key| Some(Chord::new(MOD_CONTROL | MOD_WIN, key));
+        let win_alt = |key| Some(Chord::new(MOD_WIN | MOD_ALT, key));
         match self {
-            Command::MarginUp => ctrl_win(0xBB),      // =
-            Command::MarginDown => ctrl_win(0xBD),    // -
-            Command::BringToFront => ctrl_win(0x48),  // H
-            Command::SendToBack => ctrl_win(0x42),    // B
-            Command::ResetLayout => ctrl_win(0x52),   // R
-            Command::CycleNext => ctrl_win(0xDD),     // ]
-            Command::CyclePrevious => ctrl_win(0xDB), // [
+            Command::MarginUp => win_alt(0xBB),      // =
+            Command::MarginDown => win_alt(0xBD),    // -
+            Command::BringToFront => win_alt(0x21),  // PageUp
+            Command::SendToBack => win_alt(0x22),    // PageDown
+            Command::ResetLayout => win_alt(0x24),   // Home
+            Command::CycleNext => win_alt(0xDD),     // ]
+            Command::CyclePrevious => win_alt(0xDB), // [
+            Command::OpenPalette => win_alt(0x20),   // Space
             Command::LoadWorkspace(_) => None,
         }
     }
@@ -84,7 +90,7 @@ impl AppState {
         self.hotkey_bindings().into_iter().find(|&(used, other)| used == chord && other != except).map(|(_, other)| other)
     }
 
-    /// The current chord as people read it, e.g. "Ctrl+Win+]".
+    /// The current chord as people read it, e.g. "Win+Alt+]".
     pub fn chord_label(&self, command: Command) -> Option<String> {
         self.chord_for(command).map(|c| c.display())
     }

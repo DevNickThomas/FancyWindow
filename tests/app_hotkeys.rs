@@ -14,22 +14,23 @@ fn saved(effects: &[Effect]) -> &Settings {
 }
 
 #[test]
-fn defaults_match_the_original_chords() {
+fn defaults_use_win_alt_and_leave_ctrl_win_free() {
     let state = AppState::new();
     let labels: Vec<(Command, String)> = CONFIGURABLE.iter().map(|&c| (c, state.chord_label(c).unwrap())).collect();
     assert_eq!(
         labels,
         vec![
-            (Command::CycleNext, "Ctrl+Win+]".into()),
-            (Command::CyclePrevious, "Ctrl+Win+[".into()),
-            (Command::SendToBack, "Ctrl+Win+B".into()),
-            (Command::BringToFront, "Ctrl+Win+H".into()),
-            (Command::MarginUp, "Ctrl+Win+=".into()),
-            (Command::MarginDown, "Ctrl+Win+-".into()),
-            (Command::ResetLayout, "Ctrl+Win+R".into()),
+            (Command::CycleNext, "Win+Alt+]".into()),
+            (Command::CyclePrevious, "Win+Alt+[".into()),
+            (Command::SendToBack, "Win+Alt+PageDown".into()),
+            (Command::BringToFront, "Win+Alt+PageUp".into()),
+            (Command::MarginUp, "Win+Alt+=".into()),
+            (Command::MarginDown, "Win+Alt+-".into()),
+            (Command::ResetLayout, "Win+Alt+Home".into()),
+            (Command::OpenPalette, "Win+Alt+Space".into()),
         ]
     );
-    assert_eq!(state.hotkey_bindings().len(), 7);
+    assert_eq!(state.hotkey_bindings().len(), 8);
 }
 
 #[test]
@@ -54,22 +55,22 @@ fn clearing_leaves_the_command_without_a_chord() {
 fn choosing_the_default_again_removes_the_override() {
     let mut state = AppState::new();
     set(&mut state, Command::SendToBack, Some("Ctrl+Alt+B"));
-    set(&mut state, Command::SendToBack, Some("Ctrl+Win+B"));
+    set(&mut state, Command::SendToBack, Some("Alt+Win+PageDown"));
     assert!(state.settings.hotkeys.is_empty());
 }
 
 #[test]
 fn a_chord_used_elsewhere_is_refused() {
     let mut state = AppState::new();
-    let effects = set(&mut state, Command::CycleNext, Some("Ctrl+Win+B"));
+    let effects = set(&mut state, Command::CycleNext, Some("Alt+Win+PageDown"));
     assert!(matches!(&effects[..], [Effect::ShowWarning { text, .. }] if text.contains("Send Fancy Window behind")));
-    assert_eq!(state.chord_label(Command::CycleNext).as_deref(), Some("Ctrl+Win+]"));
+    assert_eq!(state.chord_label(Command::CycleNext).as_deref(), Some("Win+Alt+]"));
 }
 
 #[test]
 fn chord_user_names_the_other_command_but_not_itself() {
     let state = AppState::new();
-    let b = chord("Ctrl+Win+B").unwrap();
+    let b = chord("Alt+Win+PageDown").unwrap();
     assert_eq!(state.chord_user(b, Command::CycleNext), Some(Command::SendToBack));
     assert_eq!(state.chord_user(b, Command::SendToBack), None);
     assert_eq!(state.chord_user(chord("Ctrl+Alt+K").unwrap(), Command::CycleNext), None);
@@ -100,8 +101,8 @@ fn reset_restores_every_default() {
     set(&mut state, Command::ResetLayout, None);
     let effects = update(&mut state, Msg::ResetHotkeys);
     assert!(state.settings.hotkeys.is_empty());
-    assert!(effects.contains(&Effect::BindHotkey { command: Command::CycleNext, chord: chord("Ctrl+Win+OemCloseBrackets") }));
-    assert!(effects.contains(&Effect::BindHotkey { command: Command::ResetLayout, chord: chord("Ctrl+Win+R") }));
+    assert!(effects.contains(&Effect::BindHotkey { command: Command::CycleNext, chord: chord("Alt+Win+OemCloseBrackets") }));
+    assert!(effects.contains(&Effect::BindHotkey { command: Command::ResetLayout, chord: chord("Alt+Win+Home") }));
 }
 
 #[test]
@@ -130,4 +131,13 @@ fn chords_display_with_symbols() {
     assert_eq!(chord("Ctrl+Win+OemMinus").unwrap().display(), "Ctrl+Win+-");
     assert_eq!(chord("Ctrl+Win+D7").unwrap().display(), "Ctrl+Win+7");
     assert_eq!(chord("Ctrl+Alt+Delete").unwrap().display(), "Ctrl+Alt+Delete");
+}
+
+#[test]
+fn no_default_takes_ctrl_win() {
+    // Ctrl+Win chords are left to other apps.
+    let state = AppState::new();
+    for (chord, command) in state.hotkey_bindings() {
+        assert!(!(chord.modifiers & MOD_CONTROL != 0 && chord.modifiers & MOD_WIN != 0), "{command:?} uses Ctrl+Win");
+    }
 }

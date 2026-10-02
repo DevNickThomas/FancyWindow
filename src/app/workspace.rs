@@ -18,7 +18,7 @@ impl AppState {
     }
 }
 
-fn display_name(ws: &Workspace) -> &str {
+pub(super) fn display_name(ws: &Workspace) -> &str {
     ws.name.as_deref().unwrap_or("(unnamed)")
 }
 

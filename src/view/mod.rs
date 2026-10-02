@@ -1,13 +1,18 @@
 //! Turns `AppState` into pixels. Reads state; never changes it.
 //!
-//! Client area, top to bottom: menu bar, zone canvas, status bar.
+//! Client area, top to bottom: title bar (icon, menus, caption buttons), zone
+//! canvas, status bar. The native caption is gone; see `titlebar`.
 
 pub(crate) mod gdi;
 mod paint;
 mod theme;
+mod statusbar;
+mod titlebar;
 
-pub use paint::{draw_reminder, menu_title_rects, paint, status_help_rect};
+pub use paint::{TitleChrome, draw_reminder, measure_status_bar, measure_title_bar, paint, render};
+pub use statusbar::{STATUS_BAR_HEIGHT, StatusHit, StatusLayout, layout as status_layout};
 pub use theme::{ACCENT_SWATCHES, Color, PRESETS, Theme};
+pub use titlebar::{CaptionButton, TITLE_BAR_HEIGHT, TitleHit, TitleLayout, layout as title_layout};
 
 use crate::app::AppState;
 
@@ -18,19 +23,15 @@ pub fn theme_of(state: &AppState) -> Theme {
 
 use crate::model::Rect;
 
-/// Menu bar and status bar heights in DIPs.
-pub const MENU_BAR_HEIGHT: f64 = 26.0;
-pub const STATUS_BAR_HEIGHT: f64 = 24.0;
-
 /// Canvas size in DIPs for a client area in pixels.
 pub fn canvas_size(client_width_px: f64, client_height_px: f64, scale: f64) -> (f64, f64) {
-    let height = client_height_px / scale - MENU_BAR_HEIGHT - STATUS_BAR_HEIGHT;
+    let height = (client_height_px - canvas_top_px(scale)) / scale - STATUS_BAR_HEIGHT;
     (client_width_px / scale, height.max(0.0))
 }
 
 /// Pixels from the top of the client area to the top of the canvas.
 pub fn canvas_top_px(scale: f64) -> f64 {
-    (MENU_BAR_HEIGHT * scale).round()
+    (TITLE_BAR_HEIGHT * scale).round()
 }
 
 /// A DIP rect to pixels relative to the canvas.

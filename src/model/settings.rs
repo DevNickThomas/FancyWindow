@@ -25,6 +25,9 @@ pub struct Settings {
     /// the defaults. New in the Rust version; the .NET app ignores it.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub hotkeys: BTreeMap<String, String>,
+    /// A header over each zone with the hosted window's icon, title and a release button.
+    /// New in the Rust version.
+    pub show_zone_headers: bool,
 }
 
 /// A saved layout with an optional global hotkey.
@@ -55,7 +58,7 @@ impl Default for Settings {
             window_margin: 0,
             last_layout_json: None,
             workspaces: vec![None; WORKSPACE_SLOTS],
-            theme_name: "Dark".into(),
+            theme_name: "Dark Modern".into(),
             accent_color: "#007ACC".into(),
             window_width: None,
             window_height: None,
@@ -63,6 +66,7 @@ impl Default for Settings {
             window_top: None,
             window_maximized: false,
             hotkeys: BTreeMap::new(),
+            show_zone_headers: true,
         }
     }
 }

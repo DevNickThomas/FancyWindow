@@ -127,6 +127,7 @@ fn file_and_help_items_become_effects() {
     assert_eq!(menu(&mut state, MenuAction::Exit), vec![Effect::Exit]);
     assert_eq!(menu(&mut state, MenuAction::OpenSettingsFolder), vec![Effect::OpenSettingsFolder]);
     assert_eq!(menu(&mut state, MenuAction::ShowShortcuts), vec![Effect::ShowShortcuts]);
-    assert_eq!(menu(&mut state, MenuAction::Run(Command::MarginUp)), vec![]);
+    // The status bar shows the margin.
+    assert_eq!(menu(&mut state, MenuAction::Run(Command::MarginUp)), vec![Effect::Repaint]);
     assert_eq!(state.margin, 2.0);
 }

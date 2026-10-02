@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
+
 use crate::model::{GridLayout, Orientation, Point, Rect, Settings, SplitterHandle, ZoneRect};
 
 use super::{Attachment, Frame, Modifiers, WindowId};
@@ -22,10 +25,17 @@ pub struct AppState {
     pub settings: Settings,
     /// `--profile` name; `None` for the default profile.
     pub profile: Option<String>,
-    /// The hosted window the last Ctrl+Win+] / [ focused.
+    /// The hosted window the last Win+Alt+] / [ focused, or the user last activated.
     pub cycle: Option<WindowId>,
-    /// Sticky Ctrl+Win+B: stay at the back, even after attaching windows.
+    /// The foreground window, if it is one of ours; its zone is drawn with the active glow.
+    pub active: Option<WindowId>,
+    /// Sticky Win+Alt+PageDown: stay at the back, even after attaching windows.
     pub stay_back: bool,
+    /// Hosted windows' titles, as the platform last read them (for the zone headers).
+    pub titles: HashMap<WindowId, String>,
+    /// Saved workspaces' layouts, parsed once per JSON text: the status and title bars
+    /// ask which one is on screen on every repaint.
+    pub(crate) parsed_workspaces: RefCell<Vec<Option<(String, Option<GridLayout>)>>>,
 }
 
 /// A splitter being dragged, and where the mouse was last time it moved.
@@ -40,6 +50,8 @@ pub enum CursorKind {
     Arrow,
     SizeWestEast,
     SizeNorthSouth,
+    /// Over a zone header's ×.
+    Hand,
 }
 
 impl AppState {
@@ -61,7 +73,10 @@ impl AppState {
             settings,
             profile,
             cycle: None,
+            active: None,
             stay_back: false,
+            titles: HashMap::new(),
+            parsed_workspaces: RefCell::new(Vec::new()),
         }
     }
 
@@ -76,6 +91,19 @@ impl AppState {
     /// Topmost splitter under the point (splitters sit above zones).
     pub fn splitter_at(&self, p: Point) -> Option<SplitterHandle> {
         self.splitters().into_iter().rev().find(|s| s.bounds.contains(p))
+    }
+
+    /// The splitter to light up, as VS Code does its sashes: the one being dragged,
+    /// else the one under the mouse. The rest are plain gaps between zones.
+    pub fn highlighted_splitter(&self) -> Option<Rect> {
+        match self.drag {
+            Some(d) => self
+                .splitters()
+                .into_iter()
+                .find(|s| s.split_id == d.handle.split_id && s.left_child_index == d.handle.left_child_index)
+                .map(|s| s.bounds),
+            None => self.splitter_at(self.hover?).map(|s| s.bounds),
+        }
     }
 
     /// The line showing where a Ctrl (vertical) or Shift (horizontal) click would split.
@@ -99,6 +127,7 @@ impl AppState {
         let orientation = match (self.drag, self.splitter_at(p)) {
             (Some(d), _) => d.handle.orientation,
             (None, Some(s)) => s.orientation,
+            (None, None) if matches!(self.header_at(p), Some(super::HeaderHit::Close(_))) => return CursorKind::Hand,
             (None, None) => return CursorKind::Arrow,
         };
         match orientation {

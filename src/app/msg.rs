@@ -30,7 +30,7 @@ pub enum Msg {
     SetTheme(String),
     /// An accent colour (#RRGGBB) was picked in Preferences.
     SetAccent(String),
-    /// Ctrl+Win+] or [; `has_peer` says whether another instance could take the cycle over.
+    /// Win+Alt+] or [; `has_peer` says whether another instance could take the cycle over.
     Cycle { forward: bool, has_peer: bool },
     /// Another instance handed the cycle to this one.
     BeginCycleAtEdge { forward: bool },
@@ -38,8 +38,12 @@ pub enum Msg {
     WindowDropped { window: WindowId, at: Point, alt: bool },
     /// A hosted window no longer exists.
     WindowClosed(WindowId),
+    /// A hosted window's title, read on hosting and whenever it changes.
+    TitleChanged { window: WindowId, title: String },
     /// Fancy Window became the active window.
     Activated,
+    /// Some window, ours or not, became the foreground window.
+    ForegroundChanged(WindowId),
     /// Fancy Window is about to close; `bounds` is its normal (unmaximised) placement.
     Closing { bounds: WindowBounds },
 }
@@ -101,6 +105,8 @@ pub enum Effect {
     BindHotkey { command: Command, chord: Option<Chord> },
     ShowWarning { title: String, text: String },
     ShowPreferences,
+    /// Open the command palette; a pick comes back as `Msg::Menu`.
+    ShowPalette,
     /// The theme changed: recolour title bars, menus and the reminder.
     ApplyTheme,
 }

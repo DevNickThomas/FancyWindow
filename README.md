@@ -22,6 +22,8 @@ PC": choose **More info > Run anyway**. Check the download against the
 3. Drag splitters to resize; **right-click a splitter** to merge.
 4. **Ctrl+click** a zone to split it into columns, **Shift+click** for rows,
    **Ctrl+right-click** for the zone menu (split, join, remove).
+5. Each hosted window gets a header with its icon and title: click it to focus the
+   window, click **×** to let it go. **Layout > Hide zone headers** turns them off.
 
 ## Keyboard shortcuts
 
@@ -33,11 +35,15 @@ then try key combinations. Each one is checked as you press it: **Available**,
 
 | Chord | Action |
 | --- | --- |
-| `Ctrl+Win+B` | Send Fancy Window behind everything (stays back while you attach) |
-| `Ctrl+Win+H` | Bring it forward and leave stay-back |
-| `Ctrl+Win+]` / `[` | Focus the next / previous hosted window, across instances |
-| `Ctrl+Win+=` / `-` | Increase / decrease the hosted-window margin |
-| `Ctrl+Win+R` | Reset to a 2x2 grid |
+| `Win+Alt+PageDown` | Send Fancy Window behind everything (stays back while you attach) |
+| `Win+Alt+PageUp` | Bring it forward and leave stay-back |
+| `Win+Alt+]` / `[` | Focus the next / previous hosted window, across instances |
+| `Win+Alt+=` / `-` | Increase / decrease the hosted-window margin |
+| `Win+Alt+Home` | Reset to a 2x2 grid |
+| `Win+Alt+Space` | Command palette: every layout, workspace and command, filtered as you type (also **File > Command palette**, or click the box in the title bar) |
+
+Defaults avoid `Ctrl+Win`, which many other tools use. `Win+Alt+B` and `Win+Alt+R`
+belong to Windows (HDR toggle, Game Bar recording), hence PageUp/PageDown and Home.
 
 Workspace hotkeys are set under **Workspaces > Set hotkey**. Changed hotkeys are
 saved in `settings.json` under `hotkeys`.
@@ -79,7 +85,8 @@ cargo build --release      # target\release\fancy-window.exe
 After changing dependencies, run `scripts/third-party-notices.sh` to refresh
 `THIRD-PARTY-NOTICES.txt`, which ships in the zip.
 
-`scripts\test-windows.ps1` opens throwaway windows for trying Alt+drag safely.
+`scripts\test-windows.ps1` opens throwaway windows for trying Alt+drag safely, and
+`scripts\ui-test\` runs the user stories end to end against them (see its README).
 
 ## Licence
 

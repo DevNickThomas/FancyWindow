@@ -1,22 +1,34 @@
 use crate::model::{Orientation, Point};
 
-use super::attach::{forget_all, raise_all, reflow, window_dropped};
+use super::attach::{foreground_changed, forget_all, raise_all, reflow, window_dropped};
 use super::command::{self, begin_cycle_at_edge, cycle};
-use super::{hotkeys, menu, workspace};
-use super::{AppState, Button, Drag, Effect, Modifiers, Msg};
+use super::{headers, hotkeys, menu, workspace};
+use super::{AppState, Button, Drag, Effect, Modifiers, Msg, WindowId};
 
 /// Ignore drags smaller than this many DIPs.
 const MIN_DRAG_STEP: f64 = 0.5;
 
 /// The single place where state changes. Returns what the platform must do next.
 ///
-/// Whenever the layout, frame or margin changes, hosted windows are moved to match.
+/// Whenever the layout, frame, margin or header height changes, hosted windows are
+/// moved to match. Whenever anything the canvas or status bar shows changes, it is repainted.
 pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
-    let before = (state.layout.clone(), state.frame, state.margin);
+    let placement = |s: &AppState| (s.layout.clone(), s.frame, s.margin, s.header_height());
+    let before = placement(state);
+    let shown = |s: &AppState| (s.layout.clone(), s.margin, s.attachments.clone(), s.stay_back, s.active, s.header_height());
+    let shown_before = shown(state);
+    // A window about to be destroyed needs no repaint, and saving stays the last effect.
+    let closing = matches!(msg, Msg::Closing { .. });
     let mut effects = handle(state, msg);
-    if (state.layout.clone(), state.frame, state.margin) != before {
+    if placement(state) != before {
         effects.extend(reflow(state));
     }
+    if !closing && shown(state) != shown_before && !effects.contains(&Effect::Repaint) {
+        effects.push(Effect::Repaint);
+    }
+    // Titles are only kept for windows still hosted.
+    let hosted: Vec<WindowId> = state.attachments.iter().map(|a| a.window).collect();
+    state.titles.retain(|w, _| hosted.contains(w));
     effects
 }
 
@@ -35,6 +47,8 @@ fn handle(state: &mut AppState, msg: Msg) -> Vec<Effect> {
             vec![]
         }
         Msg::Activated => raise_all(state),
+        Msg::ForegroundChanged(window) => foreground_changed(state, window),
+        Msg::TitleChanged { window, title } => headers::title_changed(state, window, title),
         Msg::Closing { bounds } => {
             state.settings = state.current_settings();
             state.settings.set_bounds(bounds);
@@ -101,6 +115,12 @@ fn mouse_down(state: &mut AppState, at: Point, button: Button, mods: Modifiers) 
             }
         };
     }
+    // A plain click on a header; with Ctrl or Shift it splits the zone as anywhere else.
+    if button == Button::Left && mods == Modifiers::default() {
+        if let Some(hit) = state.header_at(at) {
+            return headers::clicked(state, hit);
+        }
+    }
     if button == Button::Right && mods.ctrl {
         return match state.layout.hit_test(state.frame.canvas, at) {
             Some(zone) => vec![Effect::ShowZoneMenu { zone, at }],
@@ -140,8 +160,11 @@ fn mouse_move(state: &mut AppState, at: Point, mods: Modifiers) -> Vec<Effect> {
     vec![Effect::Repaint]
 }
 
+/// Mouse moves only repaint when something drawn under the mouse changes: the split
+/// preview line or the lit splitter.
 fn repaint_if_preview_changed(state: &mut AppState, change: impl FnOnce(&mut AppState)) -> Vec<Effect> {
-    let before = state.split_preview();
+    let shown = |s: &AppState| (s.split_preview(), s.highlighted_splitter());
+    let before = shown(state);
     change(state);
-    if state.split_preview() != before { vec![Effect::Repaint] } else { vec![] }
+    if shown(state) != before { vec![Effect::Repaint] } else { vec![] }
 }

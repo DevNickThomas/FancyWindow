@@ -1,6 +1,6 @@
 //! What the global hotkeys do.
 
-use crate::model::{GridLayout, MAX_MARGIN, Rect};
+use crate::model::{GridLayout, MAX_MARGIN};
 
 use super::{AppState, Effect, WindowId};
 
@@ -10,13 +10,15 @@ const MARGIN_STEP: f64 = 2.0;
 pub enum Command {
     MarginUp,
     MarginDown,
-    /// Ctrl+Win+H: bring Fancy Window forward and leave stay-back mode.
+    /// Win+Alt+PageUp: bring Fancy Window forward and leave stay-back mode.
     BringToFront,
-    /// Ctrl+Win+B: sink behind everything and stay there across Alt+drag attaches.
+    /// Win+Alt+PageDown: sink behind everything and stay there across Alt+drag attaches.
     SendToBack,
     ResetLayout,
     CycleNext,
     CyclePrevious,
+    /// Open the command palette.
+    OpenPalette,
     /// A workspace hotkey.
     LoadWorkspace(usize),
 }
@@ -29,12 +31,6 @@ impl AppState {
             .into_iter()
             .filter_map(|zone| self.attachments.iter().find(|a| a.zone == zone).map(|a| a.window))
             .collect()
-    }
-
-    /// Outline drawn around the zone whose window the cycle just focused.
-    pub fn cycle_highlight(&self) -> Option<Rect> {
-        let zone = self.zone_of(self.cycle?)?;
-        self.zone_rects().into_iter().find(|z| z.id == zone).map(|z| z.bounds)
     }
 }
 
@@ -59,6 +55,7 @@ pub(super) fn run(state: &mut AppState, command: Command) -> Vec<Effect> {
         }
         // Cycling needs to know about other instances; the platform asks with `Msg::Cycle`.
         Command::CycleNext | Command::CyclePrevious => vec![],
+        Command::OpenPalette => vec![Effect::ShowPalette],
         Command::LoadWorkspace(slot) => super::workspace::load(state, slot),
     }
 }
@@ -68,7 +65,7 @@ fn adjust_margin(state: &mut AppState, delta: f64) -> Vec<Effect> {
     vec![]
 }
 
-/// One step of Ctrl+Win+] / [. At the last (or first) window, hands over to the
+/// One step of Win+Alt+] / [. At the last (or first) window, hands over to the
 /// neighbouring instance if there is one; otherwise wraps around.
 pub(super) fn cycle(state: &mut AppState, forward: bool, has_peer: bool) -> Vec<Effect> {
     let windows = state.ordered_windows();
@@ -93,8 +90,10 @@ pub(super) fn begin_cycle_at_edge(state: &mut AppState, forward: bool) -> Vec<Ef
     }
 }
 
+/// Highlights straight away rather than waiting for the foreground event to come back.
 fn focus(state: &mut AppState, window: WindowId) -> Vec<Effect> {
     state.cycle = Some(window);
+    state.active = Some(window);
     vec![Effect::Focus(window), Effect::Repaint]
 }
 

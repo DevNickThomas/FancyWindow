@@ -4,6 +4,9 @@ use crate::model::{Point, Rect, SPLITTER_THICKNESS, ZoneId};
 
 use super::{AppState, Effect};
 
+/// How far the active glow reaches into the gap around its zone (DIPs).
+const GLOW_SPREAD: f64 = 3.0;
+
 /// Gap between a hosted window and its zone outline, before the user's margin.
 const OUTLINE_BUFFER: f64 = 2.0;
 
@@ -25,25 +28,74 @@ impl AppState {
     /// Screen pixels a window hosted in `zone` should occupy.
     pub fn host_screen_rect(&self, zone: ZoneId) -> Option<Rect> {
         let bounds = self.zone_rects().into_iter().find(|z| z.id == zone)?.bounds;
-        Some(self.frame.to_screen(host_rect(bounds, self.frame.canvas, self.margin)))
+        Some(self.frame.to_screen(host_rect(bounds, self.frame.canvas, self.margin, self.header_height())))
+    }
+
+    /// Where to draw the active window's highlight (canvas DIPs), if a hosted window has focus.
+    pub fn active_highlight(&self) -> Option<ActiveHighlight> {
+        let zone = self.zone_of(self.active?)?;
+        let bounds = self.zone_rects().into_iter().find(|z| z.id == zone)?.bounds;
+        let bevel = if self.header_height() > 0.0 {
+            // Around header and window together; its top edge is the header's accent line.
+            visible_rect(bounds, self.frame.canvas)
+        } else {
+            host_rect(bounds, self.frame.canvas, self.margin, 0.0).inflate(OUTLINE_BUFFER)
+        };
+        // The glow spills a little into the gap around the zone, short of its neighbours.
+        let glow = visible_rect(bounds, self.frame.canvas).inflate(GLOW_SPREAD);
+        Some(ActiveHighlight { glow, bevel })
     }
 }
 
-/// Insets a zone so every side shows the same gap (`OUTLINE_BUFFER + margin`) to the
-/// visible edge. Sides next to a splitter lose an extra half splitter, which covers them.
-pub fn host_rect(zone: Rect, canvas: Rect, margin: f64) -> Rect {
+/// The active window's zone: a glow over the whole zone, including the splitter
+/// halves beside it, and a bevel around the hosted window (and its header, if shown).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ActiveHighlight {
+    pub glow: Rect,
+    pub bevel: Rect,
+}
+
+/// Tracks focus: only our own hosted windows light up. Activating one also moves
+/// the cycle there, so Win+Alt+] carries on from the window the user picked.
+pub(super) fn foreground_changed(state: &mut AppState, window: WindowId) -> Vec<Effect> {
+    let active = state.zone_of(window).map(|_| window);
+    if active == state.active {
+        return vec![];
+    }
+    state.active = active;
+    if active.is_some() {
+        state.cycle = active;
+    }
+    vec![Effect::Repaint]
+}
+
+/// The gap between neighbouring zones, and between zones and the canvas edge (DIPs),
+/// as in the approved mockup. The splitter's hit area sits in the middle of it.
+pub const ZONE_GAP: f64 = 8.0;
+
+/// The part of a zone that is drawn: sides next to a splitter give up half the gap,
+/// sides on the canvas edge the whole of it, so every gap is `ZONE_GAP` wide.
+pub fn visible_rect(zone: Rect, canvas: Rect) -> Rect {
+    debug_assert!(ZONE_GAP >= SPLITTER_THICKNESS, "splitters must fit in the gap");
+    let inset = |at_edge: bool| if at_edge { ZONE_GAP } else { ZONE_GAP / 2.0 };
+    let left = inset(zone.x <= canvas.x + 0.5);
+    let top = inset(zone.y <= canvas.y + 0.5);
+    let right = inset(zone.right() >= canvas.right() - 0.5);
+    let bottom = inset(zone.bottom() >= canvas.bottom() - 0.5);
+    Rect::new(zone.x + left, zone.y + top, (zone.width - left - right).max(0.0), (zone.height - top - bottom).max(0.0))
+}
+
+/// Where a hosted window sits in its zone: below the `header` (0 for none), with the
+/// same gap (`OUTLINE_BUFFER + margin`) to the visible edge on every side.
+pub fn host_rect(zone: Rect, canvas: Rect, margin: f64, header: f64) -> Rect {
+    let v = visible_rect(zone, canvas);
     let base = OUTLINE_BUFFER + margin;
-    let half = SPLITTER_THICKNESS / 2.0;
-    let inner = |at_edge: bool| if at_edge { base } else { base + half };
-    let left = inner(zone.x <= canvas.x + 0.5);
-    let top = inner(zone.y <= canvas.y + 0.5);
-    let right = inner(zone.right() >= canvas.right() - 0.5);
-    let bottom = inner(zone.bottom() >= canvas.bottom() - 0.5);
+    let header = header.min(v.height);
     Rect::new(
-        zone.x + left,
-        zone.y + top,
-        (zone.width - left - right).max(0.0),
-        (zone.height - top - bottom).max(0.0),
+        v.x + base,
+        v.y + header + base,
+        (v.width - 2.0 * base).max(0.0),
+        (v.height - header - 2.0 * base).max(0.0),
     )
 }
 
@@ -77,8 +129,11 @@ fn attach(state: &mut AppState, zone: ZoneId, window: WindowId) -> Vec<Effect> {
         .collect();
     state.attachments.retain(|a| a.zone != zone);
     state.attachments.push(Attachment { zone, window });
+    // It was just dragged, so it is the foreground window; its focus event came before it was ours.
+    state.active = Some(window);
     let rect = state.host_screen_rect(zone).expect("zone was just hit-tested");
     effects.push(Effect::Host { window, rect });
+    effects.push(Effect::Repaint);
     effects
 }
 

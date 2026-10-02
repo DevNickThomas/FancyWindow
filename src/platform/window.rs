@@ -1,6 +1,7 @@
 //! The main window: creation, the message loop, and running effects.
 
 use std::cell::Cell;
+use std::collections::HashMap;
 use std::ffi::c_void;
 
 use windows::Win32::Foundation::*;
@@ -19,10 +20,10 @@ use std::path::PathBuf;
 
 use super::preferences::{self, Change};
 use super::shortcuts::{self, Request, Row, Status};
-use super::{chrome, dialogs, host, hotkeys, indicator, input, menus, placement, storage};
-use crate::app::{AppState, CONFIGURABLE, Command, CursorKind, Effect, Frame, MenuAction, Msg, WindowId, menu_bar, update, zone_menu};
-use crate::model::{Chord, Point, Rect, Settings, ZoneId, crash_log_name};
-use crate::view::{self, Theme, theme_of};
+use super::{chrome, dialogs, host, hotkeys, indicator, input, menus, palette, placement, storage};
+use crate::app::{AppState, CONFIGURABLE, Command, CursorKind, Effect, Frame, MenuAction, Msg, StatusBar, StatusClick, WindowId, menu_bar, update, zone_menu};
+use crate::model::{Chord, Point, Settings, ZoneId, crash_log_name};
+use crate::view::{self, CaptionButton, Theme, TitleChrome, TitleHit, theme_of};
 
 const PURGE_TIMER: usize = 1;
 const PURGE_INTERVAL_MS: u32 = 2000;
@@ -36,9 +37,13 @@ thread_local! {
 struct Shell {
     state: AppState,
     tracking_leave: bool,
-    /// Menu-bar title whose popup is open, drawn pressed.
-    open_menu: Option<usize>,
+    /// Whether WM_NCMOUSELEAVE is requested (for caption-button hover).
+    tracking_nc_leave: bool,
+    /// Open menu, active state and caption-button hover for the title bar.
+    chrome: TitleChrome,
     settings_path: PathBuf,
+    /// Hosted windows' small icons for the zone headers (handles owned by those windows).
+    icons: HashMap<WindowId, isize>,
 }
 
 /// Creates the main window and runs the message loop until it closes.
@@ -49,12 +54,34 @@ pub fn run(state: AppState, settings_path: PathBuf) -> Result<()> {
         let maximized = state.settings.window_maximized;
         let hwnd = create_window(state, settings_path)?;
         MAIN.set(hwnd);
-        // Fires when any other process's window finishes a move: the Alt+drag drop.
-        let hook = SetWinEventHook(
-            EVENT_SYSTEM_MOVESIZEEND,
+        // Re-run WM_NCCALCSIZE now that the shell is attached, so the caption goes at once.
+        let _ = SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        // Fires when any other process's window starts and finishes a move: the Alt+drag drop.
+        let move_hook = SetWinEventHook(
+            EVENT_SYSTEM_MOVESIZESTART,
             EVENT_SYSTEM_MOVESIZEEND,
             None,
-            Some(on_move_size_end),
+            Some(on_move_size),
+            0,
+            0,
+            WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+        );
+        // Any window coming to the front, our own included (which clears the highlight).
+        let focus_hook = SetWinEventHook(
+            EVENT_SYSTEM_FOREGROUND,
+            EVENT_SYSTEM_FOREGROUND,
+            None,
+            Some(on_foreground),
+            0,
+            0,
+            WINEVENT_OUTOFCONTEXT,
+        );
+        // Hosted windows renaming themselves, for the zone headers.
+        let name_hook = SetWinEventHook(
+            EVENT_OBJECT_NAMECHANGE,
+            EVENT_OBJECT_NAMECHANGE,
+            None,
+            Some(on_name_change),
             0,
             0,
             WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
@@ -69,7 +96,9 @@ pub fn run(state: AppState, settings_path: PathBuf) -> Result<()> {
             let _ = TranslateMessage(&message);
             DispatchMessageW(&message);
         }
-        let _ = UnhookWinEvent(hook);
+        let _ = UnhookWinEvent(move_hook);
+        let _ = UnhookWinEvent(focus_hook);
+        let _ = UnhookWinEvent(name_hook);
     }
     Ok(())
 }
@@ -89,7 +118,7 @@ unsafe fn create_window(state: AppState, settings_path: PathBuf) -> Result<HWND>
         RegisterClassW(&class);
         let (x, y, width, height) = placement::initial(state.settings.bounds());
         let title = HSTRING::from(state.title());
-        let shell = Box::new(Shell { state, tracking_leave: false, open_menu: None, settings_path });
+        let shell = Box::new(Shell { state, tracking_leave: false, tracking_nc_leave: false, chrome: TitleChrome::default(), settings_path, icons: HashMap::new() });
         CreateWindowExW(
             WINDOW_EX_STYLE::default(),
             w!("FancyWindow"),
@@ -146,20 +175,65 @@ extern "system" fn wndproc(hwnd: HWND, message: u32, wparam: WPARAM, lparam: LPA
                 dispatch(hwnd, Msg::FrameChanged(frame(hwnd)));
             }
             WM_ACTIVATE => {
-                if (wparam.0 & 0xFFFF) as u32 != WA_INACTIVE {
+                let active = (wparam.0 & 0xFFFF) as u32 != WA_INACTIVE;
+                with_shell(hwnd, |s| s.chrome.active = active);
+                let _ = InvalidateRect(Some(hwnd), None, false);
+                if active {
                     dispatch(hwnd, Msg::Activated);
                 }
                 return DefWindowProcW(hwnd, message, wparam, lparam);
             }
             WM_TIMER if wparam.0 == PURGE_TIMER => purge_closed_windows(hwnd),
+            // Our own title bar replaces the caption; see view::titlebar.
+            WM_NCCALCSIZE if wparam.0 != 0 => {
+                remove_caption(hwnd, wparam, lparam);
+                return LRESULT(0);
+            }
+            WM_NCHITTEST => return nc_hit_test(hwnd, wparam, lparam),
+            // lparam -1: don't repaint the (now hidden) native caption on activation.
+            WM_NCACTIVATE => return DefWindowProcW(hwnd, message, wparam, LPARAM(-1)),
+            WM_NCMOUSEMOVE => {
+                let over = caption_button(wparam);
+                set_caption_hover(hwnd, over);
+                if over.is_some() {
+                    return LRESULT(0);
+                }
+                return DefWindowProcW(hwnd, message, wparam, lparam);
+            }
+            WM_NCMOUSELEAVE => {
+                with_shell(hwnd, |s| {
+                    s.tracking_nc_leave = false;
+                    s.chrome.pressed = None;
+                });
+                set_caption_hover(hwnd, None);
+            }
+            // Caption buttons are ours: let DefWindowProc near them and it draws classic ones.
+            WM_NCLBUTTONDOWN if caption_button(wparam).is_some() => {
+                with_shell(hwnd, |s| s.chrome.pressed = caption_button(wparam));
+                let _ = InvalidateRect(Some(hwnd), None, false);
+            }
+            WM_NCLBUTTONUP if caption_button(wparam).is_some() => {
+                let pressed = with_shell(hwnd, |s| s.chrome.pressed.take());
+                let _ = InvalidateRect(Some(hwnd), None, false);
+                if pressed == caption_button(wparam) {
+                    press_caption_button(hwnd, pressed);
+                }
+            }
             WM_PAINT => with_shell(hwnd, |s| {
                 let titles: Vec<&str> = menu_bar(&s.state).iter().map(|m| m.title).collect();
-                view::paint(hwnd, &s.state, &titles, s.open_menu);
+                let chrome = TitleChrome { maximized: IsZoomed(hwnd).as_bool(), ..s.chrome };
+                view::paint(hwnd, &s.state, &titles, &chrome, &s.icons);
             }),
             WM_LBUTTONDOWN if (lparam.0 >> 16) as i16 as f64 <= view::canvas_top_px(scale(hwnd)) => {
-                open_bar_menu(hwnd, (lparam.0 & 0xFFFF) as i16 as f64);
+                let (x, y) = ((lparam.0 & 0xFFFF) as i16 as f64, (lparam.0 >> 16) as i16 as f64);
+                if title_layout(hwnd).centre.is_some_and(|c| c.contains(Point::new(x, y))) {
+                    dispatch(hwnd, Msg::Menu(MenuAction::OpenPalette));
+                } else {
+                    open_bar_menu(hwnd, x);
+                }
             }
-            WM_LBUTTONDOWN if on_status_help(hwnd, lparam) => dispatch(hwnd, Msg::Menu(MenuAction::ShowShortcuts)),
+            WM_LBUTTONDOWN if click_status_bar(hwnd, lparam, false) => {}
+            WM_RBUTTONDOWN if click_status_bar(hwnd, lparam, true) => {}
             WM_ERASEBKGND => return LRESULT(1),
             WM_SETCURSOR if (lparam.0 & 0xFFFF) as u32 == HTCLIENT => {
                 set_cursor(hwnd);
@@ -203,7 +277,10 @@ fn run_effect(hwnd: HWND, effect: Effect) {
             Effect::ReleaseMouse => {
                 let _ = ReleaseCapture();
             }
-            Effect::Host { window, rect } => host::host(hwnd, window, rect),
+            Effect::Host { window, rect } => {
+                host::host(hwnd, window, rect);
+                refresh_window_info(hwnd, window);
+            }
             Effect::Place { window, rect } => host::place(hwnd, window, rect),
             Effect::Release(window) => host::release(window),
             Effect::Forget(window) => host::forget(window),
@@ -222,7 +299,10 @@ fn run_effect(hwnd: HWND, effect: Effect) {
                 }
                 let _ = SetForegroundWindow(hwnd);
             }
-            Effect::StayBackIndicator(true) => indicator::show(hwnd, theme(hwnd)),
+            Effect::StayBackIndicator(true) => {
+                let chord = with_shell(hwnd, |s| s.state.chord_label(Command::BringToFront));
+                indicator::show(hwnd, theme(hwnd), chord);
+            }
             Effect::StayBackIndicator(false) => indicator::hide(),
             Effect::ShowZoneMenu { zone, at } => show_zone_menu(hwnd, zone, at),
             Effect::OpenSettingsFolder => menus::open_folder(hwnd, &storage::exe_dir()),
@@ -257,6 +337,12 @@ This cannot be undone.", slot + 1);
             }
             Effect::ShowWarning { title, text } => dialogs::warn(hwnd, &title, &text),
             Effect::ShowPreferences => show_preferences(hwnd),
+            Effect::ShowPalette => {
+                let entries = with_shell(hwnd, |s| s.state.palette_entries());
+                if let Some(action) = palette::show(hwnd, theme(hwnd), entries) {
+                    dispatch(hwnd, Msg::Menu(action));
+                }
+            }
             Effect::ApplyTheme => apply_theme(hwnd),
             Effect::Exit => {
                 let _ = PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0));
@@ -304,11 +390,43 @@ fn purge_closed_windows(hwnd: HWND) {
     for window in windows.into_iter().filter(|w| !host::is_alive(*w)) {
         dispatch(hwnd, Msg::WindowClosed(window));
     }
+    with_shell(hwnd, |s| {
+        let hosted: Vec<WindowId> = s.state.attachments.iter().map(|a| a.window).collect();
+        s.icons.retain(|w, _| hosted.contains(w));
+    });
 }
 
-unsafe extern "system" fn on_move_size_end(_: HWINEVENTHOOK, _: u32, window: HWND, id_object: i32, _: i32, _: u32, _: u32) {
+/// Reads a hosted window's title and icon for its zone header.
+fn refresh_window_info(hwnd: HWND, window: WindowId) {
+    let icon = host::icon(window);
+    with_shell(hwnd, |s| match icon {
+        Some(icon) => s.icons.insert(window, icon),
+        None => s.icons.remove(&window),
+    });
+    dispatch(hwnd, Msg::TitleChanged { window, title: host::title(window) });
+}
+
+unsafe extern "system" fn on_name_change(_: HWINEVENTHOOK, _: u32, window: HWND, id_object: i32, id_child: i32, _: u32, _: u32) {
+    const CHILDID_SELF: i32 = 0;
+    if id_object != OBJID_WINDOW.0 || id_child != CHILDID_SELF || window.is_invalid() {
+        return;
+    }
+    let main = MAIN.get();
+    let id = WindowId(window.0 as isize);
+    // Every window in the system renames itself now and then; only ours matter.
+    if with_shell(main, |s| s.state.zone_of(id).is_some()) {
+        refresh_window_info(main, id);
+    }
+}
+
+unsafe extern "system" fn on_move_size(_: HWINEVENTHOOK, event: u32, window: HWND, id_object: i32, _: i32, _: u32, _: u32) {
     let main = MAIN.get();
     if id_object != OBJID_WINDOW.0 || window.is_invalid() || window == main {
+        return;
+    }
+    let id = WindowId(window.0 as isize);
+    if event == EVENT_SYSTEM_MOVESIZESTART {
+        host::move_started(id);
         return;
     }
     let mut cursor = POINT::default();
@@ -317,7 +435,15 @@ unsafe extern "system" fn on_move_size_end(_: HWINEVENTHOOK, _: u32, window: HWN
         GetAsyncKeyState(VK_MENU.0 as i32) as u16 & 0x8000 != 0
     };
     let at = Point::new(cursor.x as f64, cursor.y as f64);
-    dispatch(main, Msg::WindowDropped { window: WindowId(window.0 as isize), at, alt });
+    dispatch(main, Msg::WindowDropped { window: id, at, alt });
+    host::move_ended();
+}
+
+unsafe extern "system" fn on_foreground(_: HWINEVENTHOOK, _: u32, window: HWND, id_object: i32, _: i32, _: u32, _: u32) {
+    if id_object != OBJID_WINDOW.0 || window.is_invalid() {
+        return;
+    }
+    dispatch(MAIN.get(), Msg::ForegroundChanged(WindowId(window.0 as isize)));
 }
 
 fn set_cursor(hwnd: HWND) {
@@ -328,11 +454,28 @@ fn set_cursor(hwnd: HWND) {
     }
     let s = scale(hwnd);
     let top = view::canvas_top_px(s);
-    let kind = with_shell(hwnd, |sh| sh.state.cursor_at(Point::new(p.x as f64 / s, (p.y as f64 - top) / s)));
+    let mut client = RECT::default();
+    unsafe {
+        let _ = GetClientRect(hwnd, &mut client);
+    }
+    let point = Point::new(p.x as f64, p.y as f64);
+    // Measuring the bars costs text layout, so only when the pointer is in one.
+    let clickable = if point.y < top {
+        title_layout(hwnd).centre.is_some_and(|c| c.contains(point))
+    } else if point.y >= client.bottom as f64 - (view::STATUS_BAR_HEIGHT * s).round() {
+        status_bar_at(hwnd, point).is_some_and(|(hit, status, _)| match hit {
+            view::StatusHit::Help => true,
+            view::StatusHit::Segment(i) => status.left[i].click.is_some(),
+        })
+    } else {
+        false
+    };
+    let kind = if clickable { CursorKind::Hand } else { with_shell(hwnd, |sh| sh.state.cursor_at(Point::new(p.x as f64 / s, (p.y as f64 - top) / s))) };
     let id = match kind {
         CursorKind::Arrow => IDC_ARROW,
         CursorKind::SizeWestEast => IDC_SIZEWE,
         CursorKind::SizeNorthSouth => IDC_SIZENS,
+        CursorKind::Hand => IDC_HAND,
     };
     unsafe {
         SetCursor(LoadCursorW(None, id).ok());
@@ -351,22 +494,123 @@ fn track_mouse_leave(hwnd: HWND) {
 }
 
 
-/// Opens the menu-bar popup under client x (pixels), if a title is there.
-fn open_bar_menu(hwnd: HWND, x: f64) {
+/// The title bar's layout for the current client width.
+fn title_layout(hwnd: HWND) -> view::TitleLayout {
     let (menus, scale) = with_shell(hwnd, |s| (menu_bar(&s.state), s.state.frame.scale));
     let titles: Vec<&str> = menus.iter().map(|m| m.title).collect();
-    let rects = view::menu_title_rects(hwnd, &titles, scale);
+    let mut client = RECT::default();
+    unsafe {
+        let _ = GetClientRect(hwnd, &mut client);
+    }
+    view::measure_title_bar(hwnd, &titles, client.right as f64, scale)
+}
+
+/// Height of the sizing frame at this window's DPI: the top resize strip, and how far a
+/// maximised window hangs off the screen.
+fn frame_thickness(hwnd: HWND) -> i32 {
+    unsafe {
+        let dpi = GetDpiForWindow(hwnd);
+        GetSystemMetricsForDpi(SM_CYFRAME, dpi) + GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi)
+    }
+}
+
+/// WM_NCCALCSIZE: keep the default side and bottom frame (resize borders, shadow,
+/// rounded corners) but give the caption to the client area.
+fn remove_caption(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) {
+    unsafe {
+        let params = &mut *(lparam.0 as *mut NCCALCSIZE_PARAMS);
+        let top = params.rgrc[0].top;
+        DefWindowProcW(hwnd, WM_NCCALCSIZE, wparam, lparam);
+        params.rgrc[0].top = top;
+        // A maximised window hangs off the screen by its frame; keep the title bar on it.
+        if IsZoomed(hwnd).as_bool() {
+            params.rgrc[0].top += frame_thickness(hwnd);
+        }
+    }
+}
+
+/// WM_NCHITTEST: Windows still answers for the side and bottom borders; the title bar
+/// is ours. Answering HTMAXBUTTON is what brings up Windows 11's Snap Layouts.
+fn nc_hit_test(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    let default = unsafe { DefWindowProcW(hwnd, WM_NCHITTEST, wparam, lparam) };
+    if default.0 != HTCLIENT as isize {
+        return default;
+    }
+    let mut p = POINT { x: (lparam.0 & 0xFFFF) as i16 as i32, y: ((lparam.0 >> 16) & 0xFFFF) as i16 as i32 };
+    unsafe {
+        let _ = ScreenToClient(hwnd, &mut p);
+    }
+    let maximized = unsafe { IsZoomed(hwnd).as_bool() };
+    let hit = title_layout(hwnd).hit(Point::new(p.x as f64, p.y as f64), frame_thickness(hwnd) as f64, maximized);
+    let code = match hit {
+        None | Some(TitleHit::Menu(_) | TitleHit::Centre) => HTCLIENT,
+        Some(TitleHit::SystemMenu) => HTSYSMENU,
+        Some(TitleHit::Caption) => HTCAPTION,
+        Some(TitleHit::Button(CaptionButton::Minimize)) => HTMINBUTTON,
+        Some(TitleHit::Button(CaptionButton::Maximize)) => HTMAXBUTTON,
+        Some(TitleHit::Button(CaptionButton::Close)) => HTCLOSE,
+        Some(TitleHit::ResizeTop) => HTTOP,
+        Some(TitleHit::ResizeTopLeft) => HTTOPLEFT,
+        Some(TitleHit::ResizeTopRight) => HTTOPRIGHT,
+    };
+    LRESULT(code as isize)
+}
+
+/// The caption button a non-client hit-test code names.
+fn caption_button(wparam: WPARAM) -> Option<CaptionButton> {
+    match wparam.0 as u32 {
+        HTMINBUTTON => Some(CaptionButton::Minimize),
+        HTMAXBUTTON => Some(CaptionButton::Maximize),
+        HTCLOSE => Some(CaptionButton::Close),
+        _ => None,
+    }
+}
+
+fn set_caption_hover(hwnd: HWND, over: Option<CaptionButton>) {
+    if with_shell(hwnd, |s| std::mem::replace(&mut s.chrome.hover, over)) == over {
+        return;
+    }
+    if over.is_some() && !with_shell(hwnd, |s| std::mem::replace(&mut s.tracking_nc_leave, true)) {
+        let mut tme = TRACKMOUSEEVENT { cbSize: size_of::<TRACKMOUSEEVENT>() as u32, dwFlags: TME_LEAVE | TME_NONCLIENT, hwndTrack: hwnd, dwHoverTime: 0 };
+        unsafe {
+            let _ = TrackMouseEvent(&mut tme);
+        }
+    }
+    unsafe {
+        let _ = InvalidateRect(Some(hwnd), None, false);
+    }
+}
+
+/// A caption button was clicked: the usual system commands, so Windows animates them.
+fn press_caption_button(hwnd: HWND, button: Option<CaptionButton>) {
+    let command = match button {
+        Some(CaptionButton::Minimize) => SC_MINIMIZE,
+        Some(CaptionButton::Maximize) if unsafe { IsZoomed(hwnd).as_bool() } => SC_RESTORE,
+        Some(CaptionButton::Maximize) => SC_MAXIMIZE,
+        Some(CaptionButton::Close) => SC_CLOSE,
+        None => return,
+    };
+    with_shell(hwnd, |s| s.chrome.hover = None);
+    unsafe {
+        let _ = PostMessageW(Some(hwnd), WM_SYSCOMMAND, WPARAM(command as usize), LPARAM(0));
+    }
+}
+
+/// Opens the menu-bar popup under client x (pixels), if a title is there.
+fn open_bar_menu(hwnd: HWND, x: f64) {
+    let menus = with_shell(hwnd, |s| menu_bar(&s.state));
+    let rects = title_layout(hwnd).menus;
     let Some(i) = rects.iter().position(|r| x >= r.x && x < r.right()) else { return };
     let mut at = POINT { x: rects[i].x as i32, y: rects[i].bottom() as i32 };
     unsafe {
         let _ = ClientToScreen(hwnd, &mut at);
     }
-    with_shell(hwnd, |s| s.open_menu = Some(i));
+    with_shell(hwnd, |s| s.chrome.open_menu = Some(i));
     unsafe {
         let _ = InvalidateRect(Some(hwnd), None, false);
     }
     let chosen = menus::pick(hwnd, &menus[i].items, at);
-    with_shell(hwnd, |s| s.open_menu = None);
+    with_shell(hwnd, |s| s.chrome.open_menu = None);
     unsafe {
         let _ = InvalidateRect(Some(hwnd), None, false);
     }
@@ -415,14 +659,48 @@ fn show_preferences(hwnd: HWND) {
 }
 
 /// Whether a click (client pixels in `lparam`) hit the status bar's "?".
-fn on_status_help(hwnd: HWND, lparam: LPARAM) -> bool {
-    let (x, y) = ((lparam.0 & 0xFFFF) as i16 as f64, (lparam.0 >> 16) as i16 as f64);
+fn status_bar_at(hwnd: HWND, p: Point) -> Option<(view::StatusHit, StatusBar, view::StatusLayout)> {
     let mut client = RECT::default();
     unsafe {
         let _ = GetClientRect(hwnd, &mut client);
     }
-    let client = Rect::new(0.0, 0.0, client.right as f64, client.bottom as f64);
-    view::status_help_rect(hwnd, client, scale(hwnd)).contains(Point::new(x, y))
+    let (status, layout) = with_shell(hwnd, |s| view::measure_status_bar(hwnd, &s.state, client.right as f64, client.bottom as f64));
+    Some((layout.hit(p)?, status, layout))
+}
+
+fn client_point(lparam: LPARAM) -> Point {
+    Point::new((lparam.0 & 0xFFFF) as i16 as f64, (lparam.0 >> 16) as i16 as f64)
+}
+
+/// A click on the status bar: "?" opens the shortcuts; segments do what they show.
+/// Returns false if the click wasn't on anything there.
+fn click_status_bar(hwnd: HWND, lparam: LPARAM, right: bool) -> bool {
+    let Some((hit, status, layout)) = status_bar_at(hwnd, client_point(lparam)) else { return false };
+    let segment = match hit {
+        view::StatusHit::Help => {
+            dispatch(hwnd, Msg::Menu(MenuAction::ShowShortcuts));
+            return true;
+        }
+        view::StatusHit::Segment(i) => i,
+    };
+    let Some(click) = status.left[segment].click else { return false };
+    let rect = layout.segments[segment];
+    match click {
+        StatusClick::WorkspacesMenu | StatusClick::LayoutMenu => {
+            let title = if click == StatusClick::LayoutMenu { "Layout" } else { "Workspaces" };
+            let menu = with_shell(hwnd, |s| menu_bar(&s.state)).into_iter().find(|m| m.title == title).expect("menu exists");
+            let mut at = POINT { x: rect.x as i32, y: rect.y as i32 };
+            unsafe {
+                let _ = ClientToScreen(hwnd, &mut at);
+            }
+            if let Some(action) = menus::pick_upward(hwnd, &menu.items, at) {
+                dispatch(hwnd, Msg::Menu(action));
+            }
+        }
+        StatusClick::Margin => dispatch(hwnd, Msg::Command(if right { Command::MarginDown } else { Command::MarginUp })),
+        StatusClick::BringForward => dispatch(hwnd, Msg::Command(Command::BringToFront)),
+    }
+    true
 }
 
 /// Whether `chord` can be given to `command`: not used by another command here,

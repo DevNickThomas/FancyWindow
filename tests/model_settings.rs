@@ -36,7 +36,7 @@ fn writes_dotnet_property_names() {
 fn missing_fields_fall_back_to_defaults_and_unknown_fields_are_ignored() {
     let s = Settings::from_json(r##"{ "accentColor": "#FF0000", "someFutureField": 42 }"##).unwrap();
     assert_eq!(s.accent_color, "#FF0000");
-    assert_eq!(s.theme_name, "Dark");
+    assert_eq!(s.theme_name, "Dark Modern");
     assert_eq!(s.workspaces.len(), WORKSPACE_SLOTS);
     assert_eq!(s.bounds(), None);
 }

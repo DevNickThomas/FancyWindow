@@ -11,11 +11,20 @@ use crate::app::{MenuAction, MenuItem};
 
 /// Shows `items` at a screen point; returns the chosen action, or `None` if dismissed.
 pub fn pick(hwnd: HWND, items: &[MenuItem], at: POINT) -> Option<MenuAction> {
+    pick_aligned(hwnd, items, at, TPM_TOPALIGN)
+}
+
+/// Like `pick`, but the menu opens upwards from `at` (for the status bar).
+pub fn pick_upward(hwnd: HWND, items: &[MenuItem], at: POINT) -> Option<MenuAction> {
+    pick_aligned(hwnd, items, at, TPM_BOTTOMALIGN)
+}
+
+fn pick_aligned(hwnd: HWND, items: &[MenuItem], at: POINT, vertical: TRACK_POPUP_MENU_FLAGS) -> Option<MenuAction> {
     let mut actions = Vec::new();
     unsafe {
         let menu = CreatePopupMenu().ok()?;
         build(menu, items, &mut actions);
-        let flags = TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON;
+        let flags = TPM_RETURNCMD | TPM_LEFTALIGN | vertical | TPM_RIGHTBUTTON;
         let chosen = TrackPopupMenuEx(menu, flags.0, at.x, at.y, hwnd, None).0 as usize;
         let _ = DestroyMenu(menu);
         chosen.checked_sub(1).map(|i| actions[i])

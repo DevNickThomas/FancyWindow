@@ -37,6 +37,9 @@ pub enum MenuAction {
     SaveWorkspace(usize),
     SetWorkspaceHotkey(usize),
     DeleteWorkspace(usize),
+    ToggleZoneHeaders,
+    /// The title bar's centre box: open the command palette.
+    OpenPalette,
 }
 
 /// Builds a preset layout with fresh zone ids.
@@ -81,6 +84,8 @@ pub fn menu_bar(state: &AppState) -> Vec<Menu> {
         Menu {
             title: "File",
             items: vec![
+                command_item(state, "Command palette...", Command::OpenPalette),
+                MenuItem::Separator,
                 item("Open settings folder", MenuAction::OpenSettingsFolder),
                 MenuItem::Separator,
                 item("Preferences...", MenuAction::Preferences),
@@ -115,6 +120,9 @@ fn layout_items(state: &AppState) -> Vec<MenuItem> {
     items.push(command_item(state, "Increase margin", Command::MarginUp));
     items.push(command_item(state, "Decrease margin", Command::MarginDown));
     items.push(command_item(state, "Reset to 2\u{00D7}2", Command::ResetLayout));
+    items.push(MenuItem::Separator);
+    let headers = if state.settings.show_zone_headers { "Hide zone headers" } else { "Show zone headers" };
+    items.push(item(headers, MenuAction::ToggleZoneHeaders));
     items
 }
 
@@ -155,6 +163,8 @@ pub const MOUSE_GESTURES: &[(&str, &str)] = &[
     ("Ctrl + right-click a zone", "Zone menu: split, join, remove"),
     ("Drag a splitter", "Resize"),
     ("Right-click a splitter", "Merge the zones beside it"),
+    ("Click a zone header", "Focus its window"),
+    ("Click \u{00D7} on a zone header", "Let the window go"),
 ];
 
 pub(super) fn run(state: &mut AppState, action: MenuAction) -> Vec<Effect> {
@@ -180,6 +190,8 @@ pub(super) fn run(state: &mut AppState, action: MenuAction) -> Vec<Effect> {
         MenuAction::SaveWorkspace(slot) => workspace::ask_name(state, slot),
         MenuAction::SetWorkspaceHotkey(slot) => workspace::ask_hotkey(state, slot),
         MenuAction::DeleteWorkspace(slot) => workspace::ask_delete(state, slot),
+        MenuAction::ToggleZoneHeaders => super::headers::toggle(state),
+        MenuAction::OpenPalette => vec![Effect::ShowPalette],
     }
 }
 

@@ -32,3 +32,11 @@ fn formats_in_canonical_order_and_roundtrips() {
         assert_eq!(Chord::parse(text).unwrap().format(), text);
     }
 }
+
+#[test]
+fn display_puts_win_before_alt_but_files_keep_the_net_order() {
+    let chord = Chord::parse("Alt+Win+OemCloseBrackets").unwrap();
+    assert_eq!(chord.display(), "Win+Alt+]");
+    assert_eq!(chord.format(), "Alt+Win+OemCloseBrackets");
+    assert_eq!(Chord::parse("Ctrl+Win+OemMinus").unwrap().display(), "Ctrl+Win+-");
+}
