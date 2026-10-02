@@ -21,8 +21,8 @@ use std::path::PathBuf;
 use super::preferences::{self, Change};
 use super::shortcuts::{self, Request, Row, Status};
 use super::{chrome, dialogs, host, hotkeys, indicator, input, menus, palette, placement, storage};
-use crate::app::{AppState, CONFIGURABLE, Command, CursorKind, Effect, Frame, MenuAction, Msg, WindowId, menu_bar, update, zone_menu};
-use crate::model::{Chord, Point, Rect, Settings, ZoneId, crash_log_name};
+use crate::app::{AppState, CONFIGURABLE, Command, CursorKind, Effect, Frame, MenuAction, Msg, StatusBar, StatusClick, WindowId, menu_bar, update, zone_menu};
+use crate::model::{Chord, Point, Settings, ZoneId, crash_log_name};
 use crate::view::{self, CaptionButton, Theme, TitleChrome, TitleHit, theme_of};
 
 const PURGE_TIMER: usize = 1;
@@ -232,7 +232,8 @@ extern "system" fn wndproc(hwnd: HWND, message: u32, wparam: WPARAM, lparam: LPA
                     open_bar_menu(hwnd, x);
                 }
             }
-            WM_LBUTTONDOWN if on_status_help(hwnd, lparam) => dispatch(hwnd, Msg::Menu(MenuAction::ShowShortcuts)),
+            WM_LBUTTONDOWN if click_status_bar(hwnd, lparam, false) => {}
+            WM_RBUTTONDOWN if click_status_bar(hwnd, lparam, true) => {}
             WM_ERASEBKGND => return LRESULT(1),
             WM_SETCURSOR if (lparam.0 & 0xFFFF) as u32 == HTCLIENT => {
                 set_cursor(hwnd);
@@ -453,7 +454,23 @@ fn set_cursor(hwnd: HWND) {
     }
     let s = scale(hwnd);
     let top = view::canvas_top_px(s);
-    let kind = with_shell(hwnd, |sh| sh.state.cursor_at(Point::new(p.x as f64 / s, (p.y as f64 - top) / s)));
+    let mut client = RECT::default();
+    unsafe {
+        let _ = GetClientRect(hwnd, &mut client);
+    }
+    let point = Point::new(p.x as f64, p.y as f64);
+    // Measuring the bars costs text layout, so only when the pointer is in one.
+    let clickable = if point.y < top {
+        title_layout(hwnd).centre.is_some_and(|c| c.contains(point))
+    } else if point.y >= client.bottom as f64 - (view::STATUS_BAR_HEIGHT * s).round() {
+        status_bar_at(hwnd, point).is_some_and(|(hit, status, _)| match hit {
+            view::StatusHit::Help => true,
+            view::StatusHit::Segment(i) => status.left[i].click.is_some(),
+        })
+    } else {
+        false
+    };
+    let kind = if clickable { CursorKind::Hand } else { with_shell(hwnd, |sh| sh.state.cursor_at(Point::new(p.x as f64 / s, (p.y as f64 - top) / s))) };
     let id = match kind {
         CursorKind::Arrow => IDC_ARROW,
         CursorKind::SizeWestEast => IDC_SIZEWE,
@@ -642,14 +659,48 @@ fn show_preferences(hwnd: HWND) {
 }
 
 /// Whether a click (client pixels in `lparam`) hit the status bar's "?".
-fn on_status_help(hwnd: HWND, lparam: LPARAM) -> bool {
-    let (x, y) = ((lparam.0 & 0xFFFF) as i16 as f64, (lparam.0 >> 16) as i16 as f64);
+fn status_bar_at(hwnd: HWND, p: Point) -> Option<(view::StatusHit, StatusBar, view::StatusLayout)> {
     let mut client = RECT::default();
     unsafe {
         let _ = GetClientRect(hwnd, &mut client);
     }
-    let client = Rect::new(0.0, 0.0, client.right as f64, client.bottom as f64);
-    view::status_help_rect(hwnd, client, scale(hwnd)).contains(Point::new(x, y))
+    let (status, layout) = with_shell(hwnd, |s| view::measure_status_bar(hwnd, &s.state, client.right as f64, client.bottom as f64));
+    Some((layout.hit(p)?, status, layout))
+}
+
+fn client_point(lparam: LPARAM) -> Point {
+    Point::new((lparam.0 & 0xFFFF) as i16 as f64, (lparam.0 >> 16) as i16 as f64)
+}
+
+/// A click on the status bar: "?" opens the shortcuts; segments do what they show.
+/// Returns false if the click wasn't on anything there.
+fn click_status_bar(hwnd: HWND, lparam: LPARAM, right: bool) -> bool {
+    let Some((hit, status, layout)) = status_bar_at(hwnd, client_point(lparam)) else { return false };
+    let segment = match hit {
+        view::StatusHit::Help => {
+            dispatch(hwnd, Msg::Menu(MenuAction::ShowShortcuts));
+            return true;
+        }
+        view::StatusHit::Segment(i) => i,
+    };
+    let Some(click) = status.left[segment].click else { return false };
+    let rect = layout.segments[segment];
+    match click {
+        StatusClick::WorkspacesMenu | StatusClick::LayoutMenu => {
+            let title = if click == StatusClick::LayoutMenu { "Layout" } else { "Workspaces" };
+            let menu = with_shell(hwnd, |s| menu_bar(&s.state)).into_iter().find(|m| m.title == title).expect("menu exists");
+            let mut at = POINT { x: rect.x as i32, y: rect.y as i32 };
+            unsafe {
+                let _ = ClientToScreen(hwnd, &mut at);
+            }
+            if let Some(action) = menus::pick_upward(hwnd, &menu.items, at) {
+                dispatch(hwnd, Msg::Menu(action));
+            }
+        }
+        StatusClick::Margin => dispatch(hwnd, Msg::Command(if right { Command::MarginDown } else { Command::MarginUp })),
+        StatusClick::BringForward => dispatch(hwnd, Msg::Command(Command::BringToFront)),
+    }
+    true
 }
 
 /// Whether `chord` can be given to `command`: not used by another command here,

@@ -9,8 +9,9 @@ use windows::core::PCWSTR;
 
 use super::gdi::{self, Align};
 use super::titlebar::{CaptionButton, TitleLayout, layout as title_layout};
-use super::{Color, STATUS_BAR_HEIGHT, Theme, canvas_top_px, theme_of, to_px};
-use crate::app::{AppState, Segment, WindowId, ZoneHeader};
+use super::statusbar::{StatusLayout, layout as status_layout};
+use super::{Color, Theme, canvas_top_px, theme_of, to_px};
+use crate::app::{AppState, SegmentKind, StatusBar, StatusClick, WindowId, ZoneHeader};
 use crate::model::Rect;
 
 const ZONE_RADIUS: f64 = 4.0;
@@ -22,9 +23,11 @@ const HEADER_GAP: f64 = 7.0;
 /// Menu-bar titles, at VS Code's 13px UI size.
 const BAR_FONT: f64 = 13.0;
 const STATUS_FONT: f64 = 12.0;
-const STATUS_PADDING: f64 = 10.0;
-/// Space either side of each status-bar segment's text.
+/// Space either side of each status-bar segment's content (as in view::statusbar).
 const SEGMENT_PADDING: f64 = 9.0;
+/// Status-bar segment icons and the gap after them.
+const STATUS_ICON: f64 = 12.0;
+const STATUS_ICON_GAP: f64 = 5.0;
 /// Caption-button glyph size, as Windows draws them.
 const CAPTION_GLYPH: f64 = 10.0;
 const HIGHLIGHT_WIDTH: f64 = 2.0;
@@ -252,63 +255,77 @@ fn app_icon(size: i32) -> Option<isize> {
     Some(icon.0 as isize)
 }
 
-/// Accent-coloured bar: state segments from the left; hint, "?" and version on the right.
-fn draw_status_bar(hdc: HDC, client: Rect, state: &AppState, theme: &Theme) {
-    let scale = state.frame.scale;
-    let height = STATUS_BAR_HEIGHT * scale;
-    let bar = Rect::new(0.0, client.height - height, client.width, height);
-    gdi::fill(hdc, bar, theme.status_bg);
-    let font = (STATUS_FONT * scale).round() as i32;
-    let pad = SEGMENT_PADDING * scale;
-    let status = state.status_bar();
-    let mut x = bar.x;
-    for segment in &status.left {
-        let (text, background, color) = match segment {
-            Segment::Strong(t) => (t, Some(theme.status_strong), theme.status_text),
-            Segment::Plain(t) => (t, None, theme.status_text),
-            Segment::Warning(t) => (t, Some(theme.status_warn), Color(0xFF, 0xFF, 0xFF)),
-        };
-        let rect = Rect::new(x, bar.y, gdi::text_width(hdc, text, font) as f64 + 2.0 * pad, bar.height);
-        if let Some(background) = background {
-            gdi::fill(hdc, rect, background);
-        }
-        gdi::text(hdc, rect, text, color, font, Align::Center);
-        x = rect.right();
-    }
-    let inner = Rect::new(bar.x + STATUS_PADDING * scale, bar.y, bar.width - 2.0 * STATUS_PADDING * scale, bar.height);
-    gdi::text(hdc, inner, VERSION, theme.status_text, font, Align::Right);
-    let help = help_rect(hdc, client, scale);
-    gdi::text(hdc, help, "?", theme.status_text, font, Align::Center);
-    if let Some(hint) = &status.hint {
-        let width = gdi::text_width(hdc, hint, font) as f64 + 2.0 * pad;
-        // Only when it fits beside the segments; a narrow window drops it.
-        if help.x - width >= x {
-            gdi::text(hdc, Rect::new(help.x - width, bar.y, width, bar.height), hint, theme.status_text, font, Align::Center);
-        }
-    }
-}
-
-/// The "?" in the status bar that opens the keyboard shortcuts, in client pixels.
-pub fn status_help_rect(hwnd: HWND, client: Rect, scale: f64) -> Rect {
-    unsafe {
-        let hdc = GetDC(Some(hwnd));
-        let rect = help_rect(hdc, client, scale);
-        ReleaseDC(Some(hwnd), hdc);
-        rect
-    }
-}
-
-fn help_rect(hdc: HDC, client: Rect, scale: f64) -> Rect {
-    let font = (STATUS_FONT * scale).round() as i32;
-    let height = STATUS_BAR_HEIGHT * scale;
-    let width = 24.0 * scale;
-    let right = client.width - STATUS_PADDING * scale - gdi::text_width(hdc, VERSION, font) as f64 - 6.0 * scale;
-    Rect::new(right - width, client.height - height, width, height)
-}
 
 /// The stay-back reminder: accent-bordered pill with centred text.
 pub fn draw_reminder(hdc: HDC, bounds: Rect, text: &str, theme: &Theme, scale: f64) {
     gdi::fill(hdc, bounds, theme.active_bg);
     gdi::outline(hdc, bounds, theme.accent, 1, (ZONE_RADIUS * scale).round() as i32);
     gdi::text(hdc, bounds, text, theme.active_text, (REMINDER_FONT * scale).round() as i32, Align::Center);
+}
+
+/// The icon a status-bar segment shows, by what clicking it does (Segoe Fluent Icons).
+fn segment_icon(click: Option<StatusClick>) -> Option<char> {
+    match click? {
+        StatusClick::WorkspacesMenu => Some('\u{E8A4}'),
+        StatusClick::LayoutMenu => Some('\u{ECA5}'),
+        StatusClick::BringForward => Some('\u{E896}'),
+        StatusClick::Margin => None,
+    }
+}
+
+/// The status bar's contents and where they go, measured with `hdc`.
+fn status_layout_in(hdc: HDC, state: &AppState, width: f64, height: f64) -> (StatusBar, StatusLayout) {
+    let scale = state.frame.scale;
+    let font = (STATUS_FONT * scale).round() as i32;
+    let icon = (STATUS_ICON + STATUS_ICON_GAP) * scale;
+    let status = state.status_bar();
+    let contents: Vec<f64> = status
+        .left
+        .iter()
+        .map(|s| gdi::text_width(hdc, &s.text, font) as f64 + if segment_icon(s.click).is_some() { icon } else { 0.0 })
+        .collect();
+    let hint = status.hint.as_ref().map(|h| gdi::text_width(hdc, h, font) as f64);
+    let layout = status_layout(width, height, scale, &contents, hint, gdi::text_width(hdc, VERSION, font) as f64);
+    (status, layout)
+}
+
+/// The status bar's contents and layout for a client area, for hit-testing clicks.
+pub fn measure_status_bar(hwnd: HWND, state: &AppState, width: f64, height: f64) -> (StatusBar, StatusLayout) {
+    unsafe {
+        let hdc = GetDC(Some(hwnd));
+        let result = status_layout_in(hdc, state, width, height);
+        ReleaseDC(Some(hwnd), hdc);
+        result
+    }
+}
+
+/// Accent-coloured bar: icon-led segments from the left; hint, "?" and version on the right.
+fn draw_status_bar(hdc: HDC, client: Rect, state: &AppState, theme: &Theme) {
+    let scale = state.frame.scale;
+    let (status, layout) = status_layout_in(hdc, state, client.width, client.height);
+    gdi::fill(hdc, layout.bar, theme.status_bg);
+    let font = (STATUS_FONT * scale).round() as i32;
+    let pad = (SEGMENT_PADDING * scale).round();
+    for (segment, rect) in status.left.iter().zip(&layout.segments) {
+        let (background, color) = match segment.kind {
+            SegmentKind::Strong => (Some(theme.status_strong), theme.status_text),
+            SegmentKind::Plain => (None, theme.status_text),
+            SegmentKind::Warning => (Some(theme.status_warn), Color(0xFF, 0xFF, 0xFF)),
+        };
+        if let Some(background) = background {
+            gdi::fill(hdc, *rect, background);
+        }
+        let mut x = rect.x + pad;
+        if let Some(icon) = segment_icon(segment.click) {
+            let size = (STATUS_ICON * scale).round();
+            gdi::glyph(hdc, Rect::new(x, rect.y, size, rect.height), icon, color, size as i32);
+            x += size + (STATUS_ICON_GAP * scale).round();
+        }
+        gdi::text(hdc, Rect::new(x, rect.y, rect.right() - x, rect.height), &segment.text, color, font, Align::Left);
+    }
+    if let (Some(hint), Some(rect)) = (&status.hint, layout.hint) {
+        gdi::text(hdc, rect, hint, theme.status_text, font, Align::Center);
+    }
+    gdi::text(hdc, layout.help, "?", theme.status_text, font, Align::Center);
+    gdi::text(hdc, layout.version, VERSION, theme.status_text, font, Align::Right);
 }

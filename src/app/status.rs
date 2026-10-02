@@ -1,17 +1,38 @@
-//! What the status bar says, as data. The view lays it out and paints it.
+//! What the status bar says, as data. The view lays it out and paints it; clicks
+//! come back as the segment's `StatusClick`.
 
 use crate::model::{GridLayout, WORKSPACE_SLOTS};
 
 use super::workspace::display_name;
 use super::{AppState, Command};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Segment {
-    /// The workspace or profile in use, on a stronger background.
-    Strong(String),
-    Plain(String),
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SegmentKind {
+    /// The workspace and profile, on a stronger background.
+    Strong,
+    Plain,
     /// Something to notice, like being held at the back.
-    Warning(String),
+    Warning,
+}
+
+/// What clicking a segment does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StatusClick {
+    /// Pop up the Workspaces menu.
+    WorkspacesMenu,
+    /// Pop up the Layout menu.
+    LayoutMenu,
+    /// Left click widens the margin, right click narrows it.
+    Margin,
+    /// Bring Fancy Window forward.
+    BringForward,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Segment {
+    pub kind: SegmentKind,
+    pub text: String,
+    pub click: Option<StatusClick>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -26,30 +47,41 @@ impl AppState {
     /// The saved workspace whose layout is on screen now. Any edit to the layout
     /// (even a splitter drag) means it no longer is.
     pub fn current_workspace(&self) -> Option<usize> {
+        let mut cache = self.parsed_workspaces.borrow_mut();
+        cache.resize(WORKSPACE_SLOTS, None);
         (0..WORKSPACE_SLOTS).find(|&slot| {
-            self.workspace(slot).and_then(|ws| GridLayout::from_json(&ws.layout_json).ok()).is_some_and(|l| l == self.layout)
+            let Some(ws) = self.workspace(slot) else { return false };
+            // Re-parse only when the slot's JSON changed since last time.
+            if !cache[slot].as_ref().is_some_and(|(json, _)| *json == ws.layout_json) {
+                cache[slot] = Some((ws.layout_json.clone(), GridLayout::from_json(&ws.layout_json).ok()));
+            }
+            cache[slot].as_ref().and_then(|(_, layout)| layout.as_ref()) == Some(&self.layout)
         })
     }
 
     pub fn status_bar(&self) -> StatusBar {
-        let mut left = Vec::new();
+        let segment = |kind, text: String, click| Segment { kind, text, click: Some(click) };
         let workspace = self.current_workspace().and_then(|slot| self.workspace(slot)).map(|ws| display_name(ws).to_string());
         let profile = self.profile.as_ref().map(|p| format!("Profile: {p}"));
-        let strong: Vec<String> = workspace.into_iter().chain(profile).collect();
-        if !strong.is_empty() {
-            left.push(Segment::Strong(strong.join(" \u{00B7} ")));
-        }
+        // Always shown, so the Workspaces menu is one click away even before the first save.
+        let strong = match (workspace, profile) {
+            (Some(w), Some(p)) => format!("{w} \u{00B7} {p}"),
+            (Some(w), None) => w,
+            (None, Some(p)) => p,
+            (None, None) => "No workspace".into(),
+        };
+        let mut left = vec![segment(SegmentKind::Strong, strong, StatusClick::WorkspacesMenu)];
         if self.stay_back {
             let back = match self.chord_label(Command::BringToFront) {
                 Some(chord) => format!("Held at the back \u{00B7} {chord} brings it forward"),
                 None => "Held at the back".into(),
             };
-            left.push(Segment::Warning(back));
+            left.push(segment(SegmentKind::Warning, back, StatusClick::BringForward));
         }
         let zones = self.layout.leaves().len();
         let hosted = self.attachments.len();
-        left.push(Segment::Plain(format!("{} \u{00B7} {hosted} hosted", plural(zones, "zone"))));
-        left.push(Segment::Plain(format!("Margin {}", self.margin)));
+        left.push(segment(SegmentKind::Plain, format!("{} \u{00B7} {hosted} hosted", plural(zones, "zone")), StatusClick::LayoutMenu));
+        left.push(segment(SegmentKind::Plain, format!("Margin {}", self.margin), StatusClick::Margin));
         let hint = (hosted > 1).then(|| self.chord_label(Command::CycleNext)).flatten().map(|chord| format!("{chord} next window"));
         StatusBar { left, hint }
     }

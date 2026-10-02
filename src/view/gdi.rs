@@ -1,5 +1,7 @@
 //! Thin wrappers over GDI drawing calls.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::ffi::c_void;
 use std::sync::OnceLock;
 
@@ -145,17 +147,27 @@ fn with_font(hdc: HDC, px_height: i32, f: impl FnOnce()) {
 }
 
 /// Runs `f` with `face` at `px_height` selected into the DC.
+/// Fonts are cached by face and size: a repaint draws dozens of strings, and only a
+/// handful of sizes exist (a few more after a DPI change), so they are never freed.
 fn with_face(hdc: HDC, px_height: i32, face: PCWSTR, f: impl FnOnce()) {
+    thread_local! {
+        static FONTS: RefCell<HashMap<(usize, i32), HFONT>> = RefCell::new(HashMap::new());
+    }
+    // Faces are static w!() literals, so their address identifies them.
+    let key = (face.0 as usize, px_height);
+    let font = FONTS.with_borrow_mut(|fonts| {
+        *fonts.entry(key).or_insert_with(|| unsafe {
+            CreateFontW(
+                -px_height, 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0,
+                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+                0, face,
+            )
+        })
+    });
     unsafe {
-        let font = CreateFontW(
-            -px_height, 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0,
-            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-            0, face,
-        );
         let old_font = SelectObject(hdc, font.into());
         f();
         SelectObject(hdc, old_font);
-        let _ = DeleteObject(font.into());
     }
 }
 

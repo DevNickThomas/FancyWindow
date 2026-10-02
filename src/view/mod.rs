@@ -6,9 +6,11 @@
 pub(crate) mod gdi;
 mod paint;
 mod theme;
+mod statusbar;
 mod titlebar;
 
-pub use paint::{TitleChrome, draw_reminder, measure_title_bar, paint, status_help_rect};
+pub use paint::{TitleChrome, draw_reminder, measure_status_bar, measure_title_bar, paint};
+pub use statusbar::{STATUS_BAR_HEIGHT, StatusHit, StatusLayout, layout as status_layout};
 pub use theme::{ACCENT_SWATCHES, Color, PRESETS, Theme};
 pub use titlebar::{CaptionButton, TITLE_BAR_HEIGHT, TitleHit, TitleLayout, layout as title_layout};
 
@@ -20,9 +22,6 @@ pub fn theme_of(state: &AppState) -> Theme {
 }
 
 use crate::model::Rect;
-
-/// Status bar height in DIPs.
-pub const STATUS_BAR_HEIGHT: f64 = 24.0;
 
 /// Canvas size in DIPs for a client area in pixels.
 pub fn canvas_size(client_width_px: f64, client_height_px: f64, scale: f64) -> (f64, f64) {

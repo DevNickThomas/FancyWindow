@@ -17,7 +17,7 @@ unless shared).
 | Idea | Issue | State |
 | --- | --- | --- |
 | Active-zone glow and bevel, Segoe UI Variable | — | Done |
-| Live accent status bar | — | Done; clickable segments in #11 |
+| Live accent status bar, clickable segments | #11 | Done |
 | Zone headers (icon, title, number, ×) | #8 | Done |
 | One-row title bar with caption buttons | #9 | Done |
 | Command palette | #10 | Done |

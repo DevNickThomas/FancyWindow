@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 use crate::model::{GridLayout, Orientation, Point, Rect, Settings, SplitterHandle, ZoneRect};
@@ -32,6 +33,9 @@ pub struct AppState {
     pub stay_back: bool,
     /// Hosted windows' titles, as the platform last read them (for the zone headers).
     pub titles: HashMap<WindowId, String>,
+    /// Saved workspaces' layouts, parsed once per JSON text: the status and title bars
+    /// ask which one is on screen on every repaint.
+    pub(crate) parsed_workspaces: RefCell<Vec<Option<(String, Option<GridLayout>)>>>,
 }
 
 /// A splitter being dragged, and where the mouse was last time it moved.
@@ -72,6 +76,7 @@ impl AppState {
             active: None,
             stay_back: false,
             titles: HashMap::new(),
+            parsed_workspaces: RefCell::new(Vec::new()),
         }
     }
 

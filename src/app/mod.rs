@@ -22,6 +22,6 @@ pub use menu::{MOUSE_GESTURES, Menu, MenuAction, MenuItem, PRESETS, menu_bar, zo
 pub use msg::{Button, Effect, Modifiers, Msg};
 pub use palette::{PaletteEntry, PaletteMatch, filter as filter_palette};
 pub use state::{AppState, CursorKind, Drag};
-pub use status::{Segment, StatusBar};
+pub use status::{Segment, SegmentKind, StatusBar, StatusClick};
 pub use update::update;
 pub use workspace::workspace_menu;
