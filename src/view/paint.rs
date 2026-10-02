@@ -40,7 +40,6 @@ const VERSION: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 /// Paints the whole client area, double-buffered to avoid flicker.
 /// `chrome` is the title bar's window state; `icons` are hosted windows' small icons.
 pub fn paint(hwnd: HWND, state: &AppState, titles: &[&str], chrome: &TitleChrome, icons: &HashMap<WindowId, isize>) {
-    let theme = &theme_of(state);
     unsafe {
         let mut ps = PAINTSTRUCT::default();
         let hdc = BeginPaint(hwnd, &mut ps);
@@ -52,11 +51,7 @@ pub fn paint(hwnd: HWND, state: &AppState, titles: &[&str], chrome: &TitleChrome
         let bitmap = CreateCompatibleBitmap(hdc, w, h);
         let old = SelectObject(buffer, bitmap.into());
 
-        let client = Rect::new(0.0, 0.0, w as f64, h as f64);
-        gdi::fill(buffer, client, theme.window_bg);
-        draw_canvas(buffer, state, theme, icons);
-        draw_title_bar(buffer, client, state, theme, titles, chrome);
-        draw_status_bar(buffer, client, state, theme);
+        render(buffer, w as f64, h as f64, state, titles, chrome, icons);
 
         let _ = BitBlt(hdc, 0, 0, w, h, Some(buffer), 0, 0, SRCCOPY);
         SelectObject(buffer, old);
@@ -64,6 +59,17 @@ pub fn paint(hwnd: HWND, state: &AppState, titles: &[&str], chrome: &TitleChrome
         let _ = DeleteDC(buffer);
         let _ = EndPaint(hwnd, &ps);
     }
+}
+
+/// Draws the whole client area (`width` x `height` pixels) into any DC: the window's
+/// back buffer, or an off-screen bitmap (see examples/render.rs).
+pub fn render(hdc: HDC, width: f64, height: f64, state: &AppState, titles: &[&str], chrome: &TitleChrome, icons: &HashMap<WindowId, isize>) {
+    let theme = &theme_of(state);
+    let client = Rect::new(0.0, 0.0, width, height);
+    gdi::fill(hdc, client, theme.window_bg);
+    draw_canvas(hdc, state, theme, icons);
+    draw_title_bar(hdc, client, state, theme, titles, chrome);
+    draw_status_bar(hdc, client, state, theme);
 }
 
 /// Zones, splitters, the active-window highlight, zone headers, empty-zone hints and

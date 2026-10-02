@@ -9,7 +9,7 @@ mod theme;
 mod statusbar;
 mod titlebar;
 
-pub use paint::{TitleChrome, draw_reminder, measure_status_bar, measure_title_bar, paint};
+pub use paint::{TitleChrome, draw_reminder, measure_status_bar, measure_title_bar, paint, render};
 pub use statusbar::{STATUS_BAR_HEIGHT, StatusHit, StatusLayout, layout as status_layout};
 pub use theme::{ACCENT_SWATCHES, Color, PRESETS, Theme};
 pub use titlebar::{CaptionButton, TITLE_BAR_HEIGHT, TitleHit, TitleLayout, layout as title_layout};
