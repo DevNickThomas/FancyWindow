@@ -133,13 +133,15 @@ impl GridLayout {
     }
 
     /// Adds an empty zone on the outside edge. Appends to the root split when its
-    /// orientation already matches, otherwise wraps the root.
+    /// orientation already matches, otherwise wraps the root. Size a new sibling
+    /// like the average existing one: joins use pixel extents as relative weights.
     pub fn add_outer(&self, orientation: Orientation, at_end: bool) -> Self {
-        let new_child = SplitChild { node: GridNode::new_leaf(), weight: 1.0 };
+        let mut new_child = SplitChild { node: GridNode::new_leaf(), weight: 1.0 };
         if let GridNode::Split(s) = &self.root
             && s.orientation == orientation
         {
             let mut s = s.clone();
+            new_child.weight = s.total_weight() / s.children.len() as f64;
             let index = if at_end { s.children.len() } else { 0 };
             s.children.insert(index, new_child);
             return Self::new(GridNode::Split(s));

@@ -41,6 +41,19 @@ more usable space.
 
 ## Refreshing these images
 
+### Empty-pane and Add-menu update
+
+`empty-zones.png` and `add-column-before.png` were captured later on 2 October
+2026 at **888 × 594**. The before image uses the `e8422c4` application build
+(application code unchanged through main `776c4ed`); the after image uses
+the subsequent Add sizing fix and new empty-pane hint. See the
+[reproduction and verification](../qa/2026-10-02-layout-add.md) for the exact
+sequence. These are real running-app captures with empty panes, converted to PNG
+without retouching. The earlier headline image remains unchanged pending the
+requested four-terminal capture.
+
+### Capture procedure
+
 Build the intended main revision, launch a separate QA profile, and repeat the
 states above using disposable content. Keep the window size fixed during an
 animation sequence. Capture the complete host with its owned desktop windows and

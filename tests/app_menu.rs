@@ -73,6 +73,25 @@ fn add_outer_adds_a_zone() {
 }
 
 #[test]
+fn adding_a_column_after_join_keeps_and_reflows_hosted_windows() {
+    let mut state = state_with(GridLayout::equal_columns(2));
+    host(&mut state, A, 150.0, 300.0);
+    host(&mut state, B, 650.0, 300.0);
+    let left = state.zone_of(A).unwrap();
+    let right = state.zone_of(B).unwrap();
+    menu(&mut state, MenuAction::SplitZone(left, Orientation::Rows));
+    menu(&mut state, MenuAction::Join(left, JoinDirection::Down));
+    let effects = menu(&mut state, MenuAction::AddOuter { orientation: Orientation::Columns, at_end: false });
+    assert_eq!(state.layout.leaves().len(), 3);
+    assert_eq!(state.attachments.len(), 2);
+    assert_eq!(state.zone_of(A), Some(left));
+    assert_eq!(state.zone_of(B), Some(right));
+    assert!(!effects.iter().any(|e| matches!(e, Effect::Release(_))));
+    assert!(effects.iter().any(|e| matches!(e, Effect::Place { window: A, rect } if rect.x >= 300.0 && rect.width > 250.0)));
+    assert!(effects.iter().any(|e| matches!(e, Effect::Place { window: B, rect } if rect.x >= 600.0 && rect.width > 250.0)));
+}
+
+#[test]
 fn ctrl_right_click_on_zone_opens_its_menu() {
     let mut state = state_with(GridLayout::equal_columns(2));
     let ctrl = Modifiers { ctrl: true, shift: false };

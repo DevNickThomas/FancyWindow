@@ -148,23 +148,23 @@ fn draw_header(hdc: HDC, header: &ZoneHeader, theme: &Theme, icon: Option<isize>
     gdi::line(hdc, ((cx - arm) as i32, (cy + arm) as i32), ((cx + arm) as i32 + 1, (cy - arm) as i32 - 1), text, width);
 }
 
-/// "Alt + drag a window here" in the middle of an empty zone, when there is room.
-/// An empty zone, as in the mockup: a dashed outline, "Empty zone", and the two
-/// gestures with their keys drawn as chips. The text is dropped when there's no room.
+/// An empty zone: dashed outline, title and gesture hints with key chips.
+/// The text is dropped when there's no room.
 fn draw_hint(hdc: HDC, zone: Rect, theme: &Theme, scale: f64) {
     let px = |dip: f64| (dip * scale).round();
     let inset = zone.inflate(-px(1.0));
     gdi::dashed(hdc, inset, theme.zone_border, px(1.5).max(1.0) as i32, (ZONE_RADIUS * scale).round() as i32);
-    if zone.width < 240.0 * scale || zone.height < 100.0 * scale {
+    if zone.width < 260.0 * scale || zone.height < 120.0 * scale {
         return;
     }
     let line = px(24.0);
-    let top = zone.y + zone.height / 2.0 - 1.5 * line;
+    let top = zone.y + zone.height / 2.0 - 2.0 * line;
     let centre = zone.x + zone.width / 2.0;
     gdi::text(hdc, Rect::new(zone.x, top, zone.width, line), "Empty zone", theme.text, px(14.0) as i32, Align::Center);
     let hint = |y: f64, parts: &[Part]| draw_parts(hdc, centre, y, line, parts, theme, scale);
     hint(top + line, &[Part::Key("Alt"), Part::Text(" + drag a window here")]);
     hint(top + 2.0 * line, &[Part::Key("Ctrl"), Part::Text(" click splits \u{00B7} "), Part::Key("Shift"), Part::Text(" click rows")]);
+    hint(top + 3.0 * line, &[Part::Key("Ctrl"), Part::Text(" + right-click: split / join options")]);
 }
 
 /// A piece of a hint line: plain text, or a key drawn as a chip.

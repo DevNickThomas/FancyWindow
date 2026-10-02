@@ -192,6 +192,38 @@ fn move_splitter_errors() {
 // add_outer
 
 #[test]
+fn add_outer_after_join_creates_a_full_sized_row_or_column() {
+    for (orientation, across, join) in [
+        (Orientation::Columns, Orientation::Rows, JoinDirection::Down),
+        (Orientation::Rows, Orientation::Columns, JoinDirection::Right),
+    ] {
+        let original = match orientation {
+            Orientation::Columns => GridLayout::equal_columns(2),
+            Orientation::Rows => GridLayout::equal_rows(2),
+        };
+        let ids = original.leaves();
+        let joined = original.split_zone(ids[0], across).unwrap().join(ids[0], join, bounds()).unwrap();
+        // This is also the representation restored from a saved joined layout.
+        let restored = GridLayout::from_json(&joined.to_json()).unwrap();
+        for at_end in [false, true] {
+            let added = restored.add_outer(orientation, at_end);
+            let rects = added.zone_rects(bounds());
+            assert_eq!(rects.len(), 3);
+            let new = if at_end { &rects[2] } else { &rects[0] };
+            assert!(!ids.contains(&new.id));
+            for rect in &rects {
+                let (actual, expected) = match orientation {
+                    Orientation::Columns => (rect.bounds.width, bounds().width / 3.0),
+                    Orientation::Rows => (rect.bounds.height, bounds().height / 3.0),
+                };
+                assert!((actual - expected).abs() < 0.01, "{orientation:?}, end={at_end}: {actual} instead of {expected}");
+            }
+            assert!(ids.iter().all(|id| added.leaves().contains(id)));
+        }
+    }
+}
+
+#[test]
 fn add_outer_wraps_leaf_and_keeps_id() {
     let id = ZoneId::new();
     let result = GridLayout::new(GridNode::leaf(id)).add_outer(Orientation::Columns, true);

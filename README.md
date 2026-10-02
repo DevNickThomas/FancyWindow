@@ -67,6 +67,17 @@ On exposed pane backgrounds, **Ctrl+click** splits into columns, **Shift+click**
 splits into rows, and **Ctrl+right-click** opens the pane menu. **Right-click a
 splitter** to merge the panes beside it.
 
+Empty panes show **Ctrl + right-click: split / join options** as a reminder.
+To add space around the entire layout, use **Layout > Add > Column left/right**
+or **Row above/below**. Existing panes keep their contents and resize to make room.
+
+<details>
+<summary>Empty-pane controls in the current preview</summary>
+
+![Three empty columns showing the Ctrl + right-click split and join hint](docs/screenshots/empty-zones.png)
+
+</details>
+
 ## Focus, themes and colours
 
 Click a hosted app to use it, or cycle between apps with **Win+Alt+] / Win+Alt+[**.
