@@ -188,3 +188,49 @@ pub fn glyph(hdc: HDC, r: Rect, glyph: char, color: Color, px_height: i32) {
         DrawTextW(hdc, &mut wide, &mut rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     });
 }
+
+/// The face for keys and chords: Cascadia Mono (Windows 11, Terminal), else Consolas.
+fn mono_face() -> PCWSTR {
+    static CASCADIA: OnceLock<bool> = OnceLock::new();
+    if *CASCADIA.get_or_init(|| font_installed("Cascadia Mono")) { w!("Cascadia Mono") } else { w!("Consolas") }
+}
+
+/// Single-line text in the mono face.
+pub fn mono_text(hdc: HDC, r: Rect, s: &str, color: Color, px_height: i32, align: Align) {
+    let mut wide: Vec<u16> = s.encode_utf16().collect();
+    let mut rc = to_rect(r);
+    let align = match align {
+        Align::Left => DT_LEFT,
+        Align::Center => DT_CENTER,
+        Align::Right => DT_RIGHT,
+    };
+    with_face(hdc, px_height, mono_face(), || unsafe {
+        SetBkMode(hdc, TRANSPARENT);
+        SetTextColor(hdc, colorref(color));
+        DrawTextW(hdc, &mut wide, &mut rc, align | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    });
+}
+
+pub fn mono_text_width(hdc: HDC, s: &str, px_height: i32) -> i32 {
+    let wide: Vec<u16> = s.encode_utf16().collect();
+    let mut size = SIZE::default();
+    with_face(hdc, px_height, mono_face(), || unsafe {
+        let _ = GetTextExtentPoint32W(hdc, &wide, &mut size);
+    });
+    size.cx
+}
+
+/// A dashed rounded outline `width` pixels thick.
+pub fn dashed(hdc: HDC, r: Rect, color: Color, width: i32, radius: i32) {
+    let rc = to_rect(r);
+    let brush = LOGBRUSH { lbStyle: BS_SOLID, lbColor: colorref(color), lbHatch: 0 };
+    unsafe {
+        let pen = ExtCreatePen(PEN_STYLE(PS_GEOMETRIC.0 | PS_DASH.0 | PS_ENDCAP_FLAT.0), width as u32, &brush, None);
+        let old_brush = SelectObject(hdc, GetStockObject(NULL_BRUSH));
+        let old_pen = SelectObject(hdc, pen.into());
+        let _ = RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, radius * 2, radius * 2);
+        SelectObject(hdc, old_brush);
+        SelectObject(hdc, old_pen);
+        let _ = DeleteObject(pen.into());
+    }
+}

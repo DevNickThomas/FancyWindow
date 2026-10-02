@@ -93,6 +93,19 @@ impl AppState {
         self.splitters().into_iter().rev().find(|s| s.bounds.contains(p))
     }
 
+    /// The splitter to light up, as VS Code does its sashes: the one being dragged,
+    /// else the one under the mouse. The rest are plain gaps between zones.
+    pub fn highlighted_splitter(&self) -> Option<Rect> {
+        match self.drag {
+            Some(d) => self
+                .splitters()
+                .into_iter()
+                .find(|s| s.split_id == d.handle.split_id && s.left_child_index == d.handle.left_child_index)
+                .map(|s| s.bounds),
+            None => self.splitter_at(self.hover?).map(|s| s.bounds),
+        }
+    }
+
     /// The line showing where a Ctrl (vertical) or Shift (horizontal) click would split.
     pub fn split_preview(&self) -> Option<Rect> {
         let p = self.hover?;

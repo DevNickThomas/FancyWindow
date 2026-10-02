@@ -14,7 +14,10 @@ use super::{Color, Theme, canvas_top_px, theme_of, to_px};
 use crate::app::{AppState, SegmentKind, StatusBar, StatusClick, WindowId, ZoneHeader};
 use crate::model::Rect;
 
-const ZONE_RADIUS: f64 = 4.0;
+/// Zone corners, as in the mockup.
+const ZONE_RADIUS: f64 = 6.0;
+/// Key chips and the cycle-number badge, in the mono face.
+const KEY_FONT: f64 = 11.0;
 /// Zone headers: text size, icon size, left padding and gap between parts (DIPs).
 const HEADER_FONT: f64 = 12.0;
 const HEADER_ICON: f64 = 16.0;
@@ -72,11 +75,17 @@ fn draw_canvas(hdc: HDC, state: &AppState, theme: &Theme, icons: &HashMap<Window
         let _ = SetViewportOrgEx(hdc, 0, canvas_top_px(scale) as i32, Some(&mut previous));
     }
     let radius = (ZONE_RADIUS * scale).round() as i32;
-    for zone in state.zone_rects() {
+    // Occupied zones are tinted; empty ones are a dashed outline on the canvas (drawn below).
+    for zone in state.zone_rects().into_iter().filter(|z| state.attachments.iter().any(|a| a.zone == z.id)) {
         gdi::rounded(hdc, to_px(zone.bounds, scale), theme.zone_fill, theme.zone_border, radius);
     }
+    // Splitters are gaps, as in the mockup; only the one under the mouse or being dragged
+    // shows, in the accent, like VS Code's sashes.
     for splitter in state.splitters() {
-        gdi::fill(hdc, to_px(splitter.bounds, scale), theme.splitter);
+        gdi::fill(hdc, to_px(splitter.bounds, scale), theme.window_bg);
+    }
+    if let Some(lit) = state.highlighted_splitter() {
+        gdi::fill(hdc, to_px(lit, scale), theme.accent);
     }
     // After the splitters, so the glow spills onto the splitter halves beside the zone.
     let active = state.active_highlight();
@@ -120,10 +129,11 @@ fn draw_header(hdc: HDC, header: &ZoneHeader, theme: &Theme, icon: Option<isize>
     let close = to_px(header.close, scale);
     let number = header.number.to_string();
     let font = px(HEADER_FONT) as i32;
-    let badge_width = gdi::text_width(hdc, &number, font) as f64 + px(10.0);
+    let mono = px(KEY_FONT) as i32;
+    let badge_width = gdi::mono_text_width(hdc, &number, mono) as f64 + px(10.0);
     let badge = Rect::new(close.x - px(HEADER_GAP) - badge_width, bounds.y + (bounds.height - px(16.0)) / 2.0, badge_width, px(16.0));
-    gdi::rounded(hdc, badge, theme.splitter, theme.splitter, px(3.0) as i32);
-    gdi::text(hdc, badge, &number, text, font, Align::Center);
+    gdi::rounded(hdc, badge, theme.kbd_bg, theme.kbd_bg, px(3.0) as i32);
+    gdi::mono_text(hdc, badge, &number, text, mono, Align::Center);
 
     let title = if header.title.is_empty() { "(untitled)" } else { header.title.as_str() };
     let title_rect = Rect::new(x, bounds.y, (badge.x - px(HEADER_GAP) - x).max(0.0), bounds.height);
@@ -137,15 +147,52 @@ fn draw_header(hdc: HDC, header: &ZoneHeader, theme: &Theme, icon: Option<isize>
 }
 
 /// "Alt + drag a window here" in the middle of an empty zone, when there is room.
+/// An empty zone, as in the mockup: a dashed outline, "Empty zone", and the two
+/// gestures with their keys drawn as chips. The text is dropped when there's no room.
 fn draw_hint(hdc: HDC, zone: Rect, theme: &Theme, scale: f64) {
-    if zone.width < 230.0 * scale || zone.height < 70.0 * scale {
+    let px = |dip: f64| (dip * scale).round();
+    let inset = zone.inflate(-px(1.0));
+    gdi::dashed(hdc, inset, theme.zone_border, px(1.5).max(1.0) as i32, (ZONE_RADIUS * scale).round() as i32);
+    if zone.width < 240.0 * scale || zone.height < 100.0 * scale {
         return;
     }
+    let line = px(24.0);
+    let top = zone.y + zone.height / 2.0 - 1.5 * line;
+    let centre = zone.x + zone.width / 2.0;
+    gdi::text(hdc, Rect::new(zone.x, top, zone.width, line), "Empty zone", theme.text, px(14.0) as i32, Align::Center);
+    let hint = |y: f64, parts: &[Part]| draw_parts(hdc, centre, y, line, parts, theme, scale);
+    hint(top + line, &[Part::Key("Alt"), Part::Text(" + drag a window here")]);
+    hint(top + 2.0 * line, &[Part::Key("Ctrl"), Part::Text(" click splits \u{00B7} "), Part::Key("Shift"), Part::Text(" click rows")]);
+}
+
+/// A piece of a hint line: plain text, or a key drawn as a chip.
+enum Part<'a> {
+    Text(&'a str),
+    Key(&'a str),
+}
+
+/// Draws parts side by side, centred on `centre`.
+fn draw_parts(hdc: HDC, centre: f64, y: f64, height: f64, parts: &[Part], theme: &Theme, scale: f64) {
     let font = (HEADER_FONT * scale).round() as i32;
-    let line = 20.0 * scale;
-    let middle = zone.y + zone.height / 2.0;
-    gdi::text(hdc, Rect::new(zone.x, middle - line, zone.width, line), "Alt + drag a window here", theme.text, font, Align::Center);
-    gdi::text(hdc, Rect::new(zone.x, middle, zone.width, line), "Ctrl click splits \u{00B7} Shift click rows", theme.muted, font, Align::Center);
+    let mono = (KEY_FONT * scale).round() as i32;
+    let pad = (5.0 * scale).round();
+    let width = |part: &Part| match part {
+        Part::Text(t) => gdi::text_width(hdc, t, font) as f64,
+        Part::Key(k) => gdi::mono_text_width(hdc, k, mono) as f64 + 2.0 * pad,
+    };
+    let mut x = centre - parts.iter().map(width).sum::<f64>() / 2.0;
+    for part in parts {
+        let w = width(part);
+        match part {
+            Part::Text(t) => gdi::text(hdc, Rect::new(x, y, w + 1.0, height), t, theme.muted, font, Align::Left),
+            Part::Key(k) => {
+                let chip = Rect::new(x, y + (height - (18.0 * scale).round()) / 2.0, w, (18.0 * scale).round());
+                gdi::rounded(hdc, chip, theme.kbd_bg, theme.divider, (4.0 * scale).round() as i32);
+                gdi::mono_text(hdc, chip, k, theme.text, mono, Align::Center);
+            }
+        }
+        x += w;
+    }
 }
 
 /// Title-bar state only the platform knows: which menu is open, whether the window is

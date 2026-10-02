@@ -160,8 +160,11 @@ fn mouse_move(state: &mut AppState, at: Point, mods: Modifiers) -> Vec<Effect> {
     vec![Effect::Repaint]
 }
 
+/// Mouse moves only repaint when something drawn under the mouse changes: the split
+/// preview line or the lit splitter.
 fn repaint_if_preview_changed(state: &mut AppState, change: impl FnOnce(&mut AppState)) -> Vec<Effect> {
-    let before = state.split_preview();
+    let shown = |s: &AppState| (s.split_preview(), s.highlighted_splitter());
+    let before = shown(state);
     change(state);
-    if state.split_preview() != before { vec![Effect::Repaint] } else { vec![] }
+    if shown(state) != before { vec![Effect::Repaint] } else { vec![] }
 }

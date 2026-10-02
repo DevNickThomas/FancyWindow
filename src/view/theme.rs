@@ -120,6 +120,8 @@ pub struct Theme {
     pub status_text: Color,
     pub status_strong: Color,
     pub status_warn: Color,
+    /// Key chips ("Alt", "Ctrl") and badges: a faint lift of the text over the background.
+    pub kbd_bg: Color,
 }
 
 impl Theme {
@@ -148,6 +150,7 @@ impl Theme {
             status_text: if accent.is_light() { rgb(0x1F1F1F) } else { WHITE },
             status_strong: accent.darken(0.22),
             status_warn: rgb(0xC27C0E),
+            kbd_bg: p.text.over(p.window_bg, if p.window_bg.is_light() { 0.08 } else { 0.12 }),
         }
     }
 

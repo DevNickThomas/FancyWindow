@@ -133,3 +133,30 @@ fn reset_restores_two_by_two() {
     update(&mut state, Msg::Command(Command::ResetLayout));
     assert_eq!(state.layout.leaves().len(), 4);
 }
+
+// splitter highlight
+
+#[test]
+fn the_splitter_under_the_mouse_lights_up_and_repaints_once() {
+    let mut state = AppState::new();
+    state.layout = GridLayout::equal_columns(2);
+    update(&mut state, Msg::FrameChanged(Frame::new(800.0, 600.0, Point::new(0.0, 0.0), 1.0)));
+    let over = |s: &mut AppState, x: f64| update(s, Msg::MouseMove { at: Point::new(x, 300.0), mods: Modifiers::default() });
+    assert!(over(&mut state, 200.0).is_empty());
+    assert_eq!(state.highlighted_splitter(), None);
+    assert_eq!(over(&mut state, 400.0), vec![Effect::Repaint]);
+    assert_eq!(state.highlighted_splitter(), Some(Rect::new(398.0, 0.0, 4.0, 600.0)));
+    // Moving along the same splitter changes nothing.
+    assert!(update(&mut state, Msg::MouseMove { at: Point::new(400.0, 100.0), mods: Modifiers::default() }).is_empty());
+    assert_eq!(over(&mut state, 600.0), vec![Effect::Repaint]);
+}
+
+#[test]
+fn a_dragged_splitter_stays_lit_while_it_moves() {
+    let mut state = AppState::new();
+    state.layout = GridLayout::equal_columns(2);
+    update(&mut state, Msg::FrameChanged(Frame::new(800.0, 600.0, Point::new(0.0, 0.0), 1.0)));
+    update(&mut state, Msg::MouseDown { at: Point::new(400.0, 300.0), button: Button::Left, mods: Modifiers::default() });
+    update(&mut state, Msg::MouseMove { at: Point::new(500.0, 300.0), mods: Modifiers::default() });
+    assert_eq!(state.highlighted_splitter(), Some(Rect::new(498.0, 0.0, 4.0, 600.0)));
+}

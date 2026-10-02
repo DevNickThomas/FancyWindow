@@ -58,3 +58,11 @@ fn light_and_dark_presets_are_told_apart() {
         assert_eq!(Theme::new(name, "#007ACC").is_light(), light, "{name}");
     }
 }
+
+#[test]
+fn key_chips_match_the_mockup_greys() {
+    // The mockup's #333 on Dark and #EDEDED on Light, within a step.
+    assert_eq!(Theme::new("Dark", "#007ACC").kbd_bg, Color(0x33, 0x33, 0x33));
+    let light = Theme::new("Light", "#007ACC").kbd_bg;
+    assert!((0xEA..=0xEE).contains(&light.0), "{light:?}");
+}
