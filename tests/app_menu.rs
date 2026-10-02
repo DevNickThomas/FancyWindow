@@ -31,7 +31,7 @@ fn enabled(item: &MenuItem) -> bool {
 #[test]
 fn menu_bar_has_file_layout_workspaces_help() {
     let titles: Vec<&str> = menu_bar(&AppState::new()).iter().map(|m| m.title).collect();
-    assert_eq!(titles, vec!["File", "Layout", "Workspaces", "Help"]);
+    assert_eq!(titles, vec!["File", "Layout", "Workspaces", "Help", "Edit layout"]);
 }
 
 #[test]

@@ -29,6 +29,8 @@ pub struct AppState {
     pub cycle: Option<WindowId>,
     /// The foreground window, if it is one of ours; its zone is drawn with the active glow.
     pub active: Option<WindowId>,
+    /// Editing keeps this context after our toolbar or another app takes focus.
+    pub last_focused: Option<WindowId>,
     /// Sticky Win+Alt+PageDown: stay at the back, even after attaching windows.
     pub stay_back: bool,
     /// Hosted windows' titles, as the platform last read them (for the zone headers).
@@ -74,6 +76,7 @@ impl AppState {
             profile,
             cycle: None,
             active: None,
+            last_focused: None,
             stay_back: false,
             titles: HashMap::new(),
             parsed_workspaces: RefCell::new(Vec::new()),

@@ -4,9 +4,10 @@ use fancy_window::model::*;
 const A: WindowId = WindowId(1);
 const B: WindowId = WindowId(2);
 
-/// Two columns, canvas 800x600 DIPs at the screen origin, headers on (the default).
+/// Two columns, canvas 800x600 DIPs at the screen origin, headers explicitly enabled.
 fn two_columns() -> AppState {
     let mut state = AppState::new();
+    state.settings.show_zone_headers = true;
     state.layout = GridLayout::equal_columns(2);
     update(&mut state, Msg::FrameChanged(Frame::new(800.0, 600.0, Point::new(0.0, 0.0), 1.0)));
     state
@@ -25,7 +26,7 @@ fn click(state: &mut AppState, x: f64, y: f64) -> Vec<Effect> {
 }
 
 #[test]
-fn headers_are_on_by_default_and_push_windows_down() {
+fn enabled_headers_push_windows_down() {
     let mut state = two_columns();
     assert_eq!(state.header_height(), HEADER_HEIGHT);
     let effects = update(&mut state, Msg::WindowDropped { window: A, at: Point::new(200.0, 300.0), alt: true });
@@ -143,9 +144,9 @@ fn active_bevel_wraps_header_and_window() {
 }
 
 #[test]
-fn old_settings_without_the_field_turn_headers_on() {
+fn old_settings_without_the_field_keep_panes_header_free() {
     let s = Settings::from_json(r#"{ "themeName": "Dark" }"#).expect("settings");
-    assert!(s.show_zone_headers);
+    assert!(!s.show_zone_headers);
 }
 
 #[test]

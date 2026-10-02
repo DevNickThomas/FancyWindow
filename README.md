@@ -20,10 +20,15 @@ PC": choose **More info > Run anyway**. Check the download against the
    copy with its own `settings-work.json`).
 2. **Alt+drag** any window into a zone. Drag it out with Alt to let it go.
 3. Drag splitters to resize; **right-click a splitter** to merge.
-4. **Ctrl+click** a zone to split it into columns, **Shift+click** for rows,
-   **Ctrl+right-click** for the zone menu (split, join, remove).
-5. Each hosted window gets a header with its icon and title: click it to focus the
-   window, click **×** to let it go. **Layout > Hide zone headers** turns them off.
+4. Choose **Edit layout** in the toolbar, or press **Ctrl+Alt+E**. The last-used
+   hosted app's pane is selected. Click another pane or use **arrows / Tab / Shift+Tab**
+   to change the target. **V** splits into columns, **H** into rows, and **J** opens
+   split/join options. **Esc** or **Enter** finishes and returns focus to the selected
+   app. Changes apply immediately. The temporary overlay works over occupied panes.
+5. Panes have no extra title header by default. **Layout > Show zone headers** can
+   enable the optional title/focus/release controls; existing saved preferences are
+   respected. **Ctrl+click**, **Shift+click**, and **Ctrl+right-click** still work on
+   exposed zone surfaces for splitting and opening the zone menu.
 
 ## Keyboard shortcuts
 
@@ -35,6 +40,7 @@ then try key combinations. Each one is checked as you press it: **Available**,
 
 | Chord | Action |
 | --- | --- |
+| `Ctrl+Alt+E` | Edit layout, starting from the last-used hosted app |
 | `Win+Alt+PageDown` | Send Fancy Window behind everything (stays back while you attach) |
 | `Win+Alt+PageUp` | Bring it forward and leave stay-back |
 | `Win+Alt+]` / `[` | Focus the next / previous hosted window, across instances |

@@ -100,6 +100,8 @@ pub fn menu_bar(state: &AppState) -> Vec<Menu> {
             title: "Help",
             items: vec![item("Keyboard shortcuts...", MenuAction::ShowShortcuts), MenuItem::Separator, item("About", MenuAction::ShowAbout)],
         },
+        // A direct toolbar action; also exposes the command to the palette.
+        Menu { title: "Edit layout", items: vec![command_item(state, "Edit selected pane", Command::EditLayout)] },
     ]
 }
 

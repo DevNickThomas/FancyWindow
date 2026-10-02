@@ -3,12 +3,12 @@
 //! Built-in chords can be changed or cleared; changes are stored by command
 //! name in `settings.hotkeys`. Workspace chords live on their workspace.
 
-use crate::model::{Chord, MOD_ALT, MOD_WIN, WORKSPACE_SLOTS};
+use crate::model::{Chord, MOD_ALT, MOD_CONTROL, MOD_WIN, WORKSPACE_SLOTS};
 
 use super::{AppState, Command, Effect};
 
 /// The built-in commands, in the order the shortcuts dialog lists them.
-pub const CONFIGURABLE: [Command; 8] = [
+pub const CONFIGURABLE: [Command; 9] = [
     Command::CycleNext,
     Command::CyclePrevious,
     Command::SendToBack,
@@ -17,6 +17,7 @@ pub const CONFIGURABLE: [Command; 8] = [
     Command::MarginDown,
     Command::ResetLayout,
     Command::OpenPalette,
+    Command::EditLayout,
 ];
 
 impl Command {
@@ -31,6 +32,7 @@ impl Command {
             Command::CycleNext => "cycleNext",
             Command::CyclePrevious => "cyclePrevious",
             Command::OpenPalette => "openPalette",
+            Command::EditLayout => "editLayout",
             Command::LoadWorkspace(_) => "loadWorkspace",
         }
     }
@@ -45,6 +47,7 @@ impl Command {
             Command::CycleNext => "Focus next hosted window".into(),
             Command::CyclePrevious => "Focus previous hosted window".into(),
             Command::OpenPalette => "Open command palette".into(),
+            Command::EditLayout => "Edit layout".into(),
             Command::LoadWorkspace(slot) => format!("Load workspace {}", slot + 1),
         }
     }
@@ -62,6 +65,7 @@ impl Command {
             Command::CycleNext => win_alt(0xDD),     // ]
             Command::CyclePrevious => win_alt(0xDB), // [
             Command::OpenPalette => win_alt(0x20),   // Space
+            Command::EditLayout => Some(Chord::new(MOD_CONTROL | MOD_ALT, b'E' as u16)),
             Command::LoadWorkspace(_) => None,
         }
     }

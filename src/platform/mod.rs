@@ -4,6 +4,7 @@ mod chrome;
 pub mod crash;
 pub mod host;
 mod dialogs;
+mod layout_editor;
 mod hotkeys;
 mod indicator;
 mod input;

@@ -15,7 +15,8 @@ fn entries_come_from_the_menus() {
     for expected in [
         "Layout: Big left, stacked right",
         "Layout \u{203A} Add: Row above",
-        "Layout: Hide zone headers",
+        "Layout: Show zone headers",
+        "Edit layout: Edit selected pane",
         "File: Preferences",
         "Help: About",
         "Workspaces \u{203A} Save current as: Slot 1  (empty)",

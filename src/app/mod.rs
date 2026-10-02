@@ -2,6 +2,7 @@
 
 mod attach;
 mod command;
+mod editor;
 mod frame;
 mod headers;
 mod hotkeys;

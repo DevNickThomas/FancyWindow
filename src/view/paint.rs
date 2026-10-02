@@ -33,7 +33,6 @@ const STATUS_ICON: f64 = 12.0;
 const STATUS_ICON_GAP: f64 = 5.0;
 /// Caption-button glyph size, as Windows draws them.
 const CAPTION_GLYPH: f64 = 10.0;
-const HIGHLIGHT_WIDTH: f64 = 2.0;
 const REMINDER_FONT: f64 = 14.0;
 const VERSION: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 
@@ -101,10 +100,7 @@ fn draw_canvas(hdc: HDC, state: &AppState, theme: &Theme, icons: &HashMap<Window
     for header in state.zone_headers() {
         draw_header(hdc, &header, theme, icons.get(&header.window).copied(), scale);
     }
-    // Over the headers: the active header's top edge becomes its accent line.
-    if let Some(active) = active {
-        gdi::outline(hdc, to_px(active.bevel, scale), theme.active_bevel, (HIGHLIGHT_WIDTH * scale).round() as i32, radius);
-    }
+    // The background tint identifies focus; the hosted app owns its bevel/corners.
     for zone in state.empty_zones() {
         draw_hint(hdc, to_px(zone, scale), theme, scale);
     }

@@ -20,7 +20,7 @@ use std::path::PathBuf;
 
 use super::preferences::{self, Change};
 use super::shortcuts::{self, Request, Row, Status};
-use super::{chrome, dialogs, host, hotkeys, indicator, input, menus, palette, placement, storage};
+use super::{chrome, dialogs, host, hotkeys, indicator, input, layout_editor, menus, palette, placement, storage};
 use crate::app::{AppState, CONFIGURABLE, Command, CursorKind, Effect, Frame, MenuAction, Msg, StatusBar, StatusClick, WindowId, menu_bar, update, zone_menu};
 use crate::model::{Chord, Point, Settings, ZoneId, crash_log_name};
 use crate::view::{self, CaptionButton, Theme, TitleChrome, TitleHit, theme_of};
@@ -343,6 +343,15 @@ This cannot be undone.", slot + 1);
                     dispatch(hwnd, Msg::Menu(action));
                 }
             }
+            Effect::ShowLayoutEditor => {
+                let state = with_shell(hwnd, |s| s.state.clone());
+                if let Some(window) = layout_editor::show(hwnd, state, |action| {
+                    if let Some(action) = action { dispatch(hwnd, Msg::Menu(action)); }
+                    with_shell(hwnd, |s| s.state.clone())
+                }) {
+                    run_effect(hwnd, Effect::Focus(window));
+                }
+            }
             Effect::ApplyTheme => apply_theme(hwnd),
             Effect::Exit => {
                 let _ = PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0));
@@ -601,6 +610,10 @@ fn open_bar_menu(hwnd: HWND, x: f64) {
     let menus = with_shell(hwnd, |s| menu_bar(&s.state));
     let rects = title_layout(hwnd).menus;
     let Some(i) = rects.iter().position(|r| x >= r.x && x < r.right()) else { return };
+    if menus[i].title == "Edit layout" {
+        dispatch(hwnd, Msg::Command(Command::EditLayout));
+        return;
+    }
     let mut at = POINT { x: rects[i].x as i32, y: rects[i].bottom() as i32 };
     unsafe {
         let _ = ClientToScreen(hwnd, &mut at);

@@ -19,6 +19,8 @@ pub enum Command {
     CyclePrevious,
     /// Open the command palette.
     OpenPalette,
+    /// Edit the pane belonging to the most recently focused hosted app.
+    EditLayout,
     /// A workspace hotkey.
     LoadWorkspace(usize),
 }
@@ -56,6 +58,7 @@ pub(super) fn run(state: &mut AppState, command: Command) -> Vec<Effect> {
         // Cycling needs to know about other instances; the platform asks with `Msg::Cycle`.
         Command::CycleNext | Command::CyclePrevious => vec![],
         Command::OpenPalette => vec![Effect::ShowPalette],
+        Command::EditLayout => vec![Effect::ShowLayoutEditor],
         Command::LoadWorkspace(slot) => super::workspace::load(state, slot),
     }
 }

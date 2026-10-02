@@ -66,7 +66,7 @@ impl Default for Settings {
             window_top: None,
             window_maximized: false,
             hotkeys: BTreeMap::new(),
-            show_zone_headers: true,
+            show_zone_headers: false,
         }
     }
 }

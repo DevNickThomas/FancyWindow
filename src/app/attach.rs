@@ -65,6 +65,7 @@ pub(super) fn foreground_changed(state: &mut AppState, window: WindowId) -> Vec<
     state.active = active;
     if active.is_some() {
         state.cycle = active;
+        state.last_focused = active;
     }
     vec![Effect::Repaint]
 }
@@ -131,6 +132,7 @@ fn attach(state: &mut AppState, zone: ZoneId, window: WindowId) -> Vec<Effect> {
     state.attachments.push(Attachment { zone, window });
     // It was just dragged, so it is the foreground window; its focus event came before it was ours.
     state.active = Some(window);
+    state.last_focused = Some(window);
     let rect = state.host_screen_rect(zone).expect("zone was just hit-tested");
     effects.push(Effect::Host { window, rect });
     effects.push(Effect::Repaint);

@@ -94,10 +94,17 @@ pub fn capture_hotkey(
     let mut usable = current.is_some_and(audition);
     loop {
         let pressed = dialog.run(|msg| {
-            if msg.message != WM_KEYDOWN && msg.message != WM_SYSKEYDOWN {
-                return false;
-            }
-            match captured_chord(msg.wParam.0 as u16) {
+            let capture = match msg.message {
+                // Registered chords arrive as WM_HOTKEY, not WM_KEYDOWN. Consume
+                // them here so auditioning a conflict cannot run the old command.
+                WM_HOTKEY => Capture::Chord(Chord::new(
+                    (msg.lParam.0 as u32) & 0xffff,
+                    ((msg.lParam.0 as u32) >> 16) as u16,
+                )),
+                WM_KEYDOWN | WM_SYSKEYDOWN => captured_chord(msg.wParam.0 as u16),
+                _ => return false,
+            };
+            match capture {
                 Capture::Cancel => PRESSED.set(Some(CANCEL)),
                 Capture::Ignore => {}
                 Capture::Invalid(why) => {
@@ -330,7 +337,7 @@ fn draw_button(item: &DRAWITEMSTRUCT) {
         Look::Push { primary } => {
             let fill = if pressed { t.active_bg } else if primary { t.accent } else { t.splitter };
             gdi::fill(hdc, bounds, fill);
-            let text = if primary || pressed { t.active_text } else { t.text };
+            let text = if pressed { t.active_text } else if primary { t.status_text } else { t.text };
             gdi::text(hdc, bounds, &window_text(item.hwndItem), text, font, Align::Center);
         }
         Look::ThemeRow { preset, selected } => {

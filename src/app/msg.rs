@@ -107,6 +107,7 @@ pub enum Effect {
     ShowPreferences,
     /// Open the command palette; a pick comes back as `Msg::Menu`.
     ShowPalette,
+    ShowLayoutEditor,
     /// The theme changed: recolour title bars, menus and the reminder.
     ApplyTheme,
 }
