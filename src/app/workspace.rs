@@ -74,7 +74,7 @@ pub(super) fn save(state: &mut AppState, slot: usize, name: &str, saved_at_utc: 
     let hotkey_chord = state.workspace(slot).and_then(|ws| ws.hotkey_chord.clone());
     let name = Some(name.trim().to_string()).filter(|n| !n.is_empty());
     state.settings.workspaces[slot] = Some(Workspace { name, layout_json: state.layout.to_json(), saved_at_utc, hotkey_chord });
-    vec![Effect::SaveSettings(state.current_settings())]
+    vec![Effect::SaveSettings(state.current_settings()), Effect::Repaint]
 }
 
 pub(super) fn ask_hotkey(state: &AppState, slot: usize) -> Vec<Effect> {
@@ -95,5 +95,5 @@ pub(super) fn delete(state: &mut AppState, slot: usize) -> Vec<Effect> {
     if state.settings.workspaces[slot].take().is_none() {
         return vec![];
     }
-    vec![Effect::BindHotkey { command: Command::LoadWorkspace(slot), chord: None }, Effect::SaveSettings(state.current_settings())]
+    vec![Effect::BindHotkey { command: Command::LoadWorkspace(slot), chord: None }, Effect::SaveSettings(state.current_settings()), Effect::Repaint]
 }
