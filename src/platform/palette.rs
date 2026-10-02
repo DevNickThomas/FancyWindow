@@ -28,6 +28,9 @@ const VISIBLE_ROWS: usize = 12;
 const PADDING: f64 = 12.0;
 const FONT: f64 = 13.0;
 const SMALL_FONT: f64 = 12.0;
+const KEY_FONT: f64 = 11.0;
+/// Layout thumbnails, 16:10.
+const THUMB: (f64, f64) = (26.0, 16.0);
 
 struct Palette {
     entries: Vec<PaletteEntry>,
@@ -276,14 +279,18 @@ fn draw(hdc: HDC, bounds: Rect, p: &Palette) {
         if selected {
             gdi::rounded(hdc, row, t.active_bg, t.active_bg, px(4.0) as i32);
         }
-        let (color, muted) = if selected { (t.active_text, t.active_text) } else { (t.text, t.muted) };
+        let color = if selected { t.active_text } else { t.text };
         let mut right = row.right() - px(PADDING);
         if let Some(chord) = &entry.chord {
-            let w = gdi::text_width(hdc, chord, small) as f64;
-            gdi::text(hdc, Rect::new(right - w, row.y, w, row.height), chord, muted, small, Align::Left);
-            right -= w + px(PADDING);
+            right = draw_chord(hdc, right, row, chord, t, p.scale) - px(PADDING);
         }
-        let label = Rect::new(row.x + px(PADDING) - px(4.0), row.y, (right - row.x - px(PADDING)).max(0.0), row.height);
+        let mut left = row.x + px(PADDING) - px(4.0);
+        if let Some(zones) = &entry.preview {
+            let thumb = Rect::new(left, row.y + (row.height - px(THUMB.1)) / 2.0, px(THUMB.0), px(THUMB.1));
+            draw_thumbnail(hdc, thumb, zones, if selected { t.active_text } else { t.muted }, p.scale);
+            left = thumb.right() + px(10.0);
+        }
+        let label = Rect::new(left, row.y, (right - left).max(0.0), row.height);
         draw_highlighted(hdc, label, &entry.label, &m.matched, color, t.active_bevel, font);
     }
 
@@ -292,6 +299,36 @@ fn draw(hdc: HDC, bounds: Rect, p: &Palette) {
     let inner = Rect::new(px(PADDING), footer.y, footer.width - 2.0 * px(PADDING), footer.height);
     gdi::text(hdc, inner, "\u{2191}\u{2193} move     Enter apply     Esc close", t.muted, small, Align::Left);
     gdi::text(hdc, inner, &format!("{} of {}", p.matches.len(), p.entries.len()), t.muted, small, Align::Right);
+}
+
+/// A chord as one key chip per key ("Win" "Alt" "Home"), right-aligned at `right`.
+/// Returns where the chips start.
+fn draw_chord(hdc: HDC, right: f64, row: Rect, chord: &str, t: &Theme, scale: f64) -> f64 {
+    let px = |dip: f64| (dip * scale).round();
+    let mono = px(KEY_FONT) as i32;
+    let keys: Vec<&str> = chord.split('+').collect();
+    let widths: Vec<f64> = keys.iter().map(|k| gdi::mono_text_width(hdc, k, mono) as f64 + px(10.0)).collect();
+    let mut x = right - widths.iter().sum::<f64>() - px(3.0) * (keys.len() as f64 - 1.0);
+    let start = x;
+    let height = px(18.0);
+    for (key, w) in keys.iter().zip(widths) {
+        let chip = Rect::new(x, row.y + (row.height - height) / 2.0, w, height);
+        gdi::rounded(hdc, chip, t.kbd_bg, t.divider, px(3.0) as i32);
+        gdi::mono_text(hdc, chip, key, t.text, mono, Align::Center);
+        x += w + px(3.0);
+    }
+    start
+}
+
+/// A layout thumbnail: the zones of `zones` (unit square) as small filled tiles.
+fn draw_thumbnail(hdc: HDC, r: Rect, zones: &[Rect], color: Color, scale: f64) {
+    let gap = (1.0 * scale).round().max(1.0);
+    gdi::outline(hdc, r, color, 1, (2.0 * scale).round() as i32);
+    let inner = r.inflate(-gap - 1.0);
+    for z in zones {
+        let tile = Rect::new(inner.x + z.x * inner.width, inner.y + z.y * inner.height, z.width * inner.width, z.height * inner.height).inflate(-gap / 2.0);
+        gdi::fill(hdc, tile, color);
+    }
 }
 
 /// A label with the matched characters in `highlight`, drawn run by run.

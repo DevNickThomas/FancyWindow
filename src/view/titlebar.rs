@@ -5,7 +5,7 @@
 use crate::model::{Point, Rect};
 
 /// Title-bar height in DIPs.
-pub const TITLE_BAR_HEIGHT: f64 = 32.0;
+pub const TITLE_BAR_HEIGHT: f64 = 36.0;
 const ICON_LEFT: f64 = 12.0;
 const ICON_SIZE: f64 = 16.0;
 const ICON_GAP: f64 = 6.0;
@@ -15,7 +15,7 @@ const MENU_PADDING: f64 = 8.0;
 const BUTTON_WIDTH: f64 = 46.0;
 const CENTRE_WIDTH: f64 = 360.0;
 const CENTRE_MIN_WIDTH: f64 = 160.0;
-const CENTRE_HEIGHT: f64 = 22.0;
+const CENTRE_HEIGHT: f64 = 24.0;
 /// Room kept between the centre box and the menus or buttons.
 const CENTRE_GAP: f64 = 16.0;
 

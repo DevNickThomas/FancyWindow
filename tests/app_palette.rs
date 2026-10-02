@@ -91,3 +91,25 @@ fn hotkey_and_centre_box_open_the_palette() {
     assert_eq!(update(&mut state, Msg::Menu(MenuAction::OpenPalette)), vec![Effect::ShowPalette]);
     assert_eq!(state.chord_label(Command::OpenPalette).as_deref(), Some("Win+Alt+Space"));
 }
+
+#[test]
+fn layouts_carry_a_thumbnail_others_do_not() {
+    let entries = AppState::new().palette_entries();
+    let big_left = entries.iter().find(|e| e.label == "Layout: Big left, stacked right").expect("entry");
+    let zones = big_left.preview.as_ref().expect("thumbnail");
+    assert_eq!(zones.len(), 3);
+    // The big zone is two thirds of the width; all zones sit in the unit square.
+    assert!((zones[0].width - 2.0 / 3.0).abs() < 0.01, "{zones:?}");
+    assert!(zones.iter().all(|z| z.x >= 0.0 && z.y >= 0.0 && z.right() <= 1.0 + 1e-9 && z.bottom() <= 1.0 + 1e-9));
+    assert!(entries.iter().find(|e| e.label == "Help: About").unwrap().preview.is_none());
+}
+
+#[test]
+fn saved_workspaces_preview_their_layout() {
+    let mut state = AppState::new();
+    state.layout = fancy_window::model::GridLayout::equal_columns(3);
+    update(&mut state, Msg::WorkspaceNamed { slot: 0, name: "Three".into(), saved_at_utc: "2026-10-02T00:00:00Z".into() });
+    let entries = state.palette_entries();
+    let load = entries.iter().find(|e| e.action == MenuAction::LoadWorkspace(0)).expect("load entry");
+    assert_eq!(load.preview.as_ref().map(Vec::len), Some(3));
+}

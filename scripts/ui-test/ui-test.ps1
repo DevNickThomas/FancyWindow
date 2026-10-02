@@ -124,8 +124,8 @@ function MenuOpen { @([UI]::OfProcess($script:FWProc.Id) | Where-Object { [UI]::
 
 # ---- geometry ---------------------------------------------------------------
 
-# Canvas in screen px: below the 32px title bar, above the 24px status bar (100% scale).
-function Canvas { $c = [UI]::Client($script:FW); @($c[0], ($c[1] + 32), $c[2], ($c[3] - 56)) }
+# Canvas in screen px: below the 36px title bar, above the 24px status bar (100% scale).
+function Canvas { $c = [UI]::Client($script:FW); @($c[0], ($c[1] + 36), $c[2], ($c[3] - 60)) }
 
 # A zone given as fractions of the canvas, e.g. 0,0,0.5,0.5 for top-left of a 2x2.
 function ZoneRect([double]$fx, [double]$fy, [double]$fw, [double]$fh) {
@@ -371,7 +371,7 @@ Run S12 'Right-click a splitter merges the zones beside it' {
 
 Run S13 'Layout menu: Three columns keeps hosted windows in reading order' {
     $c = [UI]::Client($script:FW)
-    SClick ($c[0] + 97) ($c[1] + 16); Start-Sleep -Milliseconds 400   # "Layout" (after the app icon and File)
+    SClick ($c[0] + 97) ($c[1] + 18); Start-Sleep -Milliseconds 400   # "Layout" (after the app icon and File)
     Check 'Layout menu opened' (MenuOpen)
     Shot 'S13-layout-menu'
     if (MenuOpen) { 1..6 | ForEach-Object { SKey $VK.Down }; SKey $VK.Enter; Start-Sleep -Milliseconds 500 }
@@ -422,7 +422,7 @@ Run S17 'Reset hotkey goes back to 2x2 and releases windows to where they came f
 
 Run S18 'Workspaces menu opens' {
     $c = [UI]::Client($script:FW)
-    SClick ($c[0] + 167) ($c[1] + 16); Start-Sleep -Milliseconds 400   # "Workspaces"
+    SClick ($c[0] + 167) ($c[1] + 18); Start-Sleep -Milliseconds 400   # "Workspaces"
     Check 'Workspaces menu opened' (MenuOpen)
     Shot 'S18-workspaces-menu'
     if (MenuOpen) { SKey $VK.Esc; Start-Sleep -Milliseconds 300 }

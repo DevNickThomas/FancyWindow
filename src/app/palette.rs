@@ -1,8 +1,13 @@
 //! The command palette's contents and filtering. Every entry comes from the menus,
 //! so the palette can never offer something the menus don't (or miss something new).
 
-use super::menu::menu_bar;
+use crate::model::{GridLayout, Rect};
+
+use super::menu::{PRESETS, menu_bar};
 use super::{AppState, Command, MenuAction, MenuItem};
+
+/// Canvas a thumbnail is laid out on before scaling to a unit square (16:10, as drawn).
+const PREVIEW_CANVAS: Rect = Rect { x: 0.0, y: 0.0, width: 160.0, height: 100.0 };
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PaletteEntry {
@@ -11,6 +16,8 @@ pub struct PaletteEntry {
     /// The item's current hotkey, as people read it.
     pub chord: Option<String>,
     pub action: MenuAction,
+    /// The layout it applies, as zone rects within a unit square, for a thumbnail.
+    pub preview: Option<Vec<Rect>>,
 }
 
 /// An entry that matched the query, best first.
@@ -29,6 +36,13 @@ impl AppState {
         for menu in menu_bar(self) {
             flatten(menu.title, &menu.items, &mut entries);
         }
+        for entry in &mut entries {
+            entry.preview = match entry.action {
+                MenuAction::ApplyPreset(i) => Some(preview(&(PRESETS[i].1)())),
+                MenuAction::LoadWorkspace(slot) => self.workspace(slot).and_then(|ws| GridLayout::from_json(&ws.layout_json).ok()).map(|l| preview(&l)),
+                _ => None,
+            };
+        }
         entries
     }
 }
@@ -42,6 +56,7 @@ fn flatten(path: &str, items: &[MenuItem], out: &mut Vec<PaletteEntry>) {
                 label: format!("{path}: {}", label.trim_end_matches("...").trim()),
                 chord: shortcut.clone(),
                 action: *action,
+                preview: None,
             }),
             MenuItem::Submenu { label, items } => flatten(&format!("{path} \u{203A} {label}"), items, out),
             _ => {}
@@ -95,4 +110,10 @@ fn match_word(label: &[char], word: &str) -> Option<(i32, Vec<usize>)> {
     }
     let starts = matched.iter().filter(|&&i| at_word_start(i)).count() as i32;
     Some((word.len() as i32 + 2 * starts, matched))
+}
+
+/// A layout's zones scaled into a unit square, for drawing as a thumbnail.
+pub fn preview(layout: &GridLayout) -> Vec<Rect> {
+    let (w, h) = (PREVIEW_CANVAS.width, PREVIEW_CANVAS.height);
+    layout.zone_rects(PREVIEW_CANVAS).into_iter().map(|z| Rect::new(z.bounds.x / w, z.bounds.y / h, z.bounds.width / w, z.bounds.height / h)).collect()
 }
