@@ -1,0 +1,791 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Fancy Window Restyle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Schibsted+Grotesk:wght@500;700;800&display=swap">
+<style>
+/* Layout: a single reading column of findings; each idea pairs a full-width mockup with a feasibility card. */
+:root {
+  --bg: #F3F5F8;
+  --surface: #FFFFFF;
+  --fg: #1A1E26;
+  --muted: #5A6373;
+  --rule: #DCE1E8;
+  --accent: #0063B8;
+  --accent-soft: #E3EEF9;
+  --good: #1E7F4C;
+  --warn: #A5650A;
+  --risk: #B4372E;
+  --font-display: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1116; --surface: #171A21; --fg: #E4E7ED; --muted: #9AA3B3; --rule: #2A303A;
+    --accent: #5AAEFF; --accent-soft: #16263A; --good: #5CC98E; --warn: #E3A64A; --risk: #F07A70;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1116; --surface: #171A21; --fg: #E4E7ED; --muted: #9AA3B3; --rule: #2A303A;
+  --accent: #5AAEFF; --accent-soft: #16263A; --good: #5CC98E; --warn: #E3A64A; --risk: #F07A70;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 400 16px/1.6 var(--font-body); }
+.page { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 80px; display: grid; gap: 64px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(2rem, 5vw, 3.1rem); font-weight: 800; letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.4rem, 3vw, 1.85rem); font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--accent-soft); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+.eyebrow { font: 600 0.74rem/1 var(--font-body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.lede { font-size: 1.12rem; color: var(--muted); }
+header.intro { display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 0.88rem; color: var(--muted); }
+.meta b { color: var(--fg); font-weight: 600; }
+
+section.idea { display: grid; gap: 22px; }
+.idea-head { display: grid; gap: 10px; }
+.idea-head .tag { font: 500 0.8rem/1 var(--font-mono); color: var(--muted); }
+.figure { display: grid; gap: 10px; }
+.caption { font-size: 0.88rem; color: var(--muted); }
+.toggle { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; background: var(--surface); }
+.toggle button { font: 500 0.82rem var(--font-body); border: 0; background: transparent; color: var(--muted); padding: 6px 14px; cursor: pointer; }
+.toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.fig-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+
+.feas { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 20px 22px; display: grid; gap: 14px; }
+.feas-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 24px; }
+.stat { display: grid; gap: 2px; }
+.stat .k { font: 600 0.7rem/1.2 var(--font-body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.stat .v { font-weight: 600; }
+.feas ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; max-width: 80ch; }
+.feas li { padding-left: 2px; }
+.feas h3 { font-size: 0.95rem; }
+.pill { display: inline-block; font: 600 0.72rem/1 var(--font-body); padding: 4px 8px; border-radius: 99px; border: 1px solid currentColor; }
+.pill.s { color: var(--good); } .pill.m { color: var(--warn); } .pill.l { color: var(--risk); }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 0.92rem; }
+th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 600 0.72rem/1.3 var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; }
+
+ol.order { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; counter-reset: step; }
+ol.order li { counter-increment: step; display: grid; grid-template-columns: 2.4rem minmax(0, 1fr); gap: 12px; align-items: start; }
+ol.order li::before { content: counter(step); font: 800 1.5rem/1.1 var(--font-display); color: var(--accent); }
+ol.order b { font-weight: 600; }
+
+/* ---------- Mockup frame: fixed design size, scaled to the column ---------- */
+.fit { position: relative; width: 100%; max-width: 100%; overflow: hidden; border-radius: 8px; box-shadow: 0 1px 2px rgb(0 0 0 / .18), 0 12px 40px rgb(0 0 0 / .16); }
+.fit > .scr { position: absolute; top: 0; left: 0; transform-origin: 0 0; transform: scale(var(--s, 1)); }
+
+/* ---------- The app's own palette (deliberately fixed, not page-themed) ---------- */
+.scr {
+  --m-bg: #1F1F1F; --m-chrome: #181818; --m-border: #2B2B2B; --m-text: #CCCCCC; --m-muted: #9D9D9D;
+  --m-accent: #0078D4; --m-accent-hi: #4DA3FF; --m-zone: #1A2633; --m-zone-active: #1D3A57; --m-hover: #2A2D2E;
+  --m-input: #2A2A2A; --m-sel: #04395E; --m-sb: #0078D4; --m-sb-text: #FFFFFF; --m-kbd: #333333;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; font-size: 13px; color: var(--m-text);
+  background: var(--m-bg); display: flex; flex-direction: column; overflow: hidden;
+}
+.scr.light {
+  --m-bg: #FFFFFF; --m-chrome: #F8F8F8; --m-border: #E5E5E5; --m-text: #3B3B3B; --m-muted: #6E6E6E;
+  --m-accent: #005FB8; --m-accent-hi: #005FB8; --m-zone: #EEF4FB; --m-zone-active: #D6E7F8; --m-hover: #EBEBEB;
+  --m-input: #FFFFFF; --m-sel: #E8F1FB; --m-sb: #005FB8; --m-kbd: #EDEDED;
+}
+.scr.old { --m-bg: #1E1E1E; font-family: "Segoe UI", system-ui, sans-serif; }
+
+/* title bar */
+.tb { height: 36px; flex: none; display: flex; align-items: center; background: var(--m-chrome); border-bottom: 1px solid var(--m-border); }
+.tb .logo { width: 16px; height: 16px; margin: 0 10px 0 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5px; }
+.tb .logo i { border-radius: 2px; }
+.tb .logo i:nth-child(1) { background: #F28C28; } .tb .logo i:nth-child(2) { background: #3FB37F; }
+.tb .logo i:nth-child(3) { background: #3D8BFD; } .tb .logo i:nth-child(4) { background: #F2C230; }
+.tb .menus { display: flex; }
+.tb .menus span { padding: 4px 8px; border-radius: 4px; }
+.tb .menus span.open { background: var(--m-hover); }
+.tb .cc { margin: 0 auto; width: 360px; height: 24px; border: 1px solid var(--m-border); background: var(--m-input); border-radius: 6px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--m-muted); font-size: 12px; }
+.tb .cc svg { width: 13px; height: 13px; }
+.tb .caps { display: flex; height: 100%; }
+.tb .caps span { width: 46px; display: grid; place-items: center; }
+.tb .caps svg { width: 10px; height: 10px; stroke: var(--m-text); fill: none; stroke-width: 1; }
+.tb .spacer { flex: 1; }
+
+/* old chrome */
+.old .ttl { height: 31px; display: flex; align-items: center; background: #202020; color: #fff; font-size: 12px; }
+.old .bar { height: 26px; display: flex; align-items: center; background: #2D2D30; font-size: 15px; padding-left: 5px; }
+.old .bar span { padding: 0 9px; }
+
+/* body + rail */
+.body { flex: 1; display: flex; min-height: 0; }
+.rail { width: 48px; flex: none; background: var(--m-chrome); border-right: 1px solid var(--m-border); display: flex; flex-direction: column; align-items: center; padding-top: 4px; }
+.rail span { width: 48px; height: 48px; display: grid; place-items: center; position: relative; color: var(--m-muted); }
+.rail span.on { color: var(--m-text); }
+.rail span.on::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--m-accent); }
+.rail svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.rail .gap { flex: 1; }
+
+.side { width: 250px; flex: none; background: var(--m-chrome); border-right: 1px solid var(--m-border); display: flex; flex-direction: column; overflow: hidden; }
+.side h4 { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 10px 14px 6px; color: var(--m-muted); }
+.side .sec { font-size: 11px; font-weight: 700; padding: 8px 14px 6px; text-transform: uppercase; letter-spacing: .04em; display: flex; gap: 6px; align-items: center; }
+.presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 2px 14px 8px; }
+.thumb { aspect-ratio: 16 / 10; border-radius: 3px; position: relative; border: 1px solid var(--m-border); background: var(--m-bg); }
+.thumb.cur { outline: 1.5px solid var(--m-accent); outline-offset: 1px; }
+.thumb i { position: absolute; background: var(--m-zone-active); border-radius: 1.5px; }
+.ws { display: flex; align-items: center; gap: 8px; padding: 5px 14px; }
+.ws.cur { background: var(--m-sel); }
+.ws .n { color: var(--m-muted); width: 12px; }
+.ws .nm { flex: 1; }
+
+/* canvas + zones */
+.canvas { flex: 1; position: relative; background: var(--m-bg); }
+.z { position: absolute; display: flex; flex-direction: column; border-radius: 6px; background: var(--m-zone); border: 1px solid var(--m-border); overflow: hidden; }
+.z .zh { height: 28px; flex: none; display: flex; align-items: center; gap: 7px; padding: 0 8px 0 10px; background: var(--m-chrome); border-bottom: 1px solid var(--m-border); color: var(--m-muted); font-size: 12px; }
+.z .zh .ic { width: 14px; height: 14px; border-radius: 3px; flex: none; }
+.z .zh .t { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.z .zh .k { font: 11px "Cascadia Mono", Consolas, monospace; padding: 1px 5px; border-radius: 3px; background: var(--m-kbd); color: var(--m-muted); }
+.z .zh .x { width: 16px; height: 16px; display: grid; place-items: center; opacity: .7; }
+.z .zh .x svg { width: 8px; height: 8px; stroke: currentColor; stroke-width: 1.4; }
+.z .host { flex: 1; margin: 3px; border-radius: 3px; overflow: hidden; min-height: 0; }
+.z.active { background: var(--m-zone-active); border-color: var(--m-accent-hi); box-shadow: 0 0 0 1px var(--m-accent-hi), 0 0 18px 2px rgb(0 120 212 / .45), inset 0 1px 0 rgb(255 255 255 / .12); z-index: 1; }
+.z.active .zh { color: var(--m-text); box-shadow: inset 0 2px 0 var(--m-accent-hi); background: var(--m-bg); }
+.light .z.active { box-shadow: 0 0 0 1px var(--m-accent-hi), 0 0 16px 2px rgb(0 95 184 / .28); }
+.z.empty { background: transparent; border: 1.5px dashed var(--m-border); display: grid; place-items: center; text-align: center; color: var(--m-muted); }
+.z.empty .hint { display: grid; gap: 10px; font-size: 12.5px; }
+.z.empty .big { font-size: 14px; color: var(--m-text); }
+.kbd { font: 11px "Cascadia Mono", Consolas, monospace; padding: 2px 6px; border-radius: 4px; background: var(--m-kbd); border: 1px solid var(--m-border); border-bottom-width: 2px; color: var(--m-text); }
+
+/* old zones */
+.oldz { position: absolute; border-radius: 4px; background: #1A2C40; border: 1px solid #3F3F46; }
+.oldsplit { position: absolute; background: #3F3F46; }
+
+/* hosted window content */
+.term { background: #0C0C0C; color: #CCCCCC; font: 12px/1.55 "Cascadia Mono", Consolas, monospace; padding: 8px 10px; height: 100%; white-space: pre; overflow: hidden; }
+.term .p { color: #6FB6FF; } .term .ok { color: #3FB37F; } .term .dim { color: #7A7A7A; }
+.notepad { background: #FBFBFB; color: #1F1F1F; height: 100%; display: flex; flex-direction: column; font: 12.5px/1.6 "Cascadia Mono", Consolas, monospace; }
+.notepad .nb { background: #F0F0F0; border-bottom: 1px solid #E2E2E2; font: 12px "Segoe UI", system-ui, sans-serif; color: #333; padding: 3px 8px; display: flex; gap: 14px; }
+.notepad .tx { padding: 8px 10px; white-space: pre; overflow: hidden; }
+.browser { background: #FFFFFF; height: 100%; display: flex; flex-direction: column; color: #1B1B1B; }
+.browser .ab { background: #F3F3F3; padding: 5px 8px; border-bottom: 1px solid #E0E0E0; }
+.browser .ab div { background: #fff; border: 1px solid #DADADA; border-radius: 12px; padding: 2px 10px; font: 11.5px "Segoe UI", system-ui, sans-serif; color: #444; white-space: nowrap; overflow: hidden; }
+.browser .pg { padding: 12px 16px; font: 12px/1.5 "Segoe UI", system-ui, sans-serif; display: grid; gap: 6px; align-content: start; overflow: hidden; }
+.browser .pg b { font-size: 17px; font-weight: 600; }
+.browser .pg code { background: #F2F2F2; color: #A31515; font: 11.5px Consolas, monospace; padding: 0 3px; border-radius: 2px; }
+.browser .pg .pre { background: #F7F7F7; border: 1px solid #E5E5E5; padding: 6px 8px; font: 11px/1.5 Consolas, monospace; white-space: pre; color: #0F4C81; }
+
+/* status bar */
+.sb { height: 24px; flex: none; display: flex; align-items: stretch; background: var(--m-sb); color: var(--m-sb-text); font-size: 12px; }
+.sb span { display: flex; align-items: center; gap: 5px; padding: 0 9px; white-space: nowrap; }
+.sb .remote { background: rgb(0 0 0 / .22); padding: 0 12px; }
+.sb .warnseg { background: #C27C0E; }
+.sb .fill { flex: 1; }
+.sb svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.sb.quiet { background: var(--m-chrome); color: var(--m-muted); border-top: 1px solid var(--m-border); }
+.sb.quiet .remote { background: var(--m-accent); color: #fff; }
+
+/* command palette */
+.scrim { position: absolute; inset: 0; background: rgb(0 0 0 / .35); z-index: 5; }
+.pal { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); width: 560px; background: #222222; border: 1px solid #3C3C3C; border-radius: 8px; box-shadow: 0 10px 40px rgb(0 0 0 / .55); z-index: 6; overflow: hidden; font-size: 13px; }
+.pal .in { margin: 8px; border: 1px solid var(--m-accent); border-radius: 4px; padding: 5px 9px; background: #2A2A2A; color: #E8E8E8; display: flex; gap: 2px; }
+.pal .caret { width: 1px; background: #E8E8E8; }
+.pal .grp { padding: 4px 12px 2px; font-size: 11px; color: var(--m-muted); display: flex; justify-content: space-between; }
+.pal .row { display: flex; align-items: center; gap: 10px; padding: 5px 12px; color: #CCCCCC; }
+.pal .row.sel { background: var(--m-sel); color: #fff; box-shadow: inset 0 0 0 1px #2B79C2; }
+.pal .row .lbl { flex: 1; }
+.pal .row .lbl u { text-decoration: none; color: #4DA3FF; font-weight: 600; }
+.pal .row .thumb { width: 26px; aspect-ratio: 16/10; flex: none; }
+.pal .row .k { display: flex; gap: 3px; }
+.pal .row .k span { font: 11px "Cascadia Mono", Consolas, monospace; padding: 1px 5px; border-radius: 3px; background: #333; border: 1px solid #444; color: #CCC; }
+.pal .foot { border-top: 1px solid #333; padding: 6px 12px; color: var(--m-muted); font-size: 11.5px; display: flex; gap: 16px; }
+
+/* dropdown menu */
+.dd { position: absolute; z-index: 6; width: 290px; background: var(--m-bg); border: 1px solid var(--m-border); border-radius: 8px; box-shadow: 0 8px 30px rgb(0 0 0 / .28); padding: 4px; font-size: 13px; }
+.dd .it { display: flex; align-items: center; gap: 10px; padding: 5px 10px; border-radius: 4px; }
+.dd .it.hl { background: var(--m-accent); color: #fff; }
+.dd .it .thumb { width: 26px; flex: none; }
+.dd .it.hl .thumb { border-color: rgb(255 255 255 / .6); background: transparent; }
+.dd .it.hl .thumb i { background: rgb(255 255 255 / .75); }
+.dd .it .l { flex: 1; }
+.dd .it .s { font-size: 11.5px; color: var(--m-muted); }
+.dd .it.hl .s { color: rgb(255 255 255 / .85); }
+.dd .sep { height: 1px; background: var(--m-border); margin: 4px 8px; }
+.dd .chev { margin-left: auto; }
+
+/* callouts on crops */
+.callout { position: absolute; z-index: 8; font: 600 12px/1.3 "Segoe UI", system-ui, sans-serif; color: #fff; background: #C5288A; padding: 4px 8px; border-radius: 4px; white-space: nowrap; }
+.callout::after { content: ""; position: absolute; width: 8px; height: 8px; background: inherit; transform: rotate(45deg); }
+.callout.down::after { left: 14px; bottom: -4px; } .callout.up::after { left: 14px; top: -4px; } .callout.left::after { left: -4px; top: 9px; }
+
+@media (max-width: 720px) {
+  .feas-grid { grid-template-columns: minmax(0, 1fr); }
+  .page { gap: 48px; padding-block: 24px 56px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .toggle button { transition: background .15s, color .15s; }
+}
+</style>
+
+<main class="page">
+
+<header class="intro">
+  <div class="eyebrow">Design study · Fancy Window 2.x</div>
+  <h1>Fancy Window, restyled like a modern code editor</h1>
+  <p class="lede">Five mockups that bring Visual Studio Code's look to Fancy Window, each checked against how the app is really built: Rust, raw Win32 and GDI, one ~2.5&nbsp;MB exe, no Electron and no WebView. Every idea below can be painted by the code that already draws the menu bar, zones and status bar.</p>
+  <div class="meta"><span><b>Today</b> v2.0.0</span><span><b>Renderer</b> GDI, double-buffered</span><span><b>Canvas</b> 26&nbsp;DIP menu bar · zones · 24&nbsp;DIP status bar</span><span><b>Themes</b> 8 presets + accent</span></div>
+</header>
+
+<!-- ============ Hero: before / after ============ -->
+<section class="idea" id="overview">
+  <div class="idea-head">
+    <div class="eyebrow">Overview</div>
+    <h2>All five ideas together</h2>
+    <p>One title bar holds the icon, the menus, a command-center box that shows the current workspace, and the caption buttons. A rail on the left opens layouts and workspaces. Each zone gets a header with the hosted window's icon and title. The active window gets a bright accent bevel and glow, and the status bar turns accent blue and carries live state.</p>
+  </div>
+  <div class="figure">
+    <div class="fig-bar">
+      <div class="toggle" role="group" aria-label="Mockup version">
+        <button type="button" id="hero-new" aria-pressed="true" data-target="hero" data-mode="new">Proposed · dark</button>
+        <button type="button" id="hero-light" aria-pressed="false" data-target="hero" data-mode="light">Proposed · light</button>
+        <button type="button" id="hero-old" aria-pressed="false" data-target="hero" data-mode="old">Today</button>
+      </div>
+      <span class="caption">1100 × 660 DIP window, "Big left, stacked right" layout, three hosted apps</span>
+    </div>
+
+    <div class="fit" data-w="1100" data-h="660" id="hero">
+      <!-- proposed -->
+      <div class="scr" data-mode="new" style="width:1100px;height:660px">
+        <div class="tb">
+          <div class="logo"><i></i><i></i><i></i><i></i></div>
+          <div class="menus"><span>File</span><span>Layout</span><span>Workspaces</span><span>Help</span></div>
+          <div class="cc"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>Fancy Window — Coding</div>
+          <div class="caps">
+            <span><svg viewBox="0 0 10 10"><path d="M0 5h10"/></svg></span>
+            <span><svg viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9"/></svg></span>
+            <span><svg viewBox="0 0 10 10"><path d="M0 0l10 10M10 0 0 10"/></svg></span>
+          </div>
+        </div>
+        <div class="body">
+          <div class="rail">
+            <span class="on" title="Layouts"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16M12 12h9"/></svg></span>
+            <span title="Workspaces"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg></span>
+            <span title="Keyboard shortcuts"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h0M10 10h0M14 10h0M18 10h0M7 14h10"/></svg></span>
+            <i class="gap"></i>
+            <span title="Preferences"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></span>
+          </div>
+          <div class="canvas">
+            <div class="z active" style="left:8px;top:8px;width:618px;height:582px">
+              <div class="zh"><span class="ic" style="background:#2B2B2B;box-shadow:inset 0 0 0 1px #4DA3FF"></span><span class="t">PowerShell — D:\projects\fancy-window-rs\source</span><span class="k">1</span><span class="x"><svg viewBox="0 0 8 8"><path d="M0 0l8 8M8 0 0 8"/></svg></span></div>
+              <div class="host"><div class="term"><span class="p">PS D:\projects\fancy-window-rs\source&gt;</span> cargo test
+<span class="dim">   Compiling fancy-window v2.0.0</span>
+<span class="dim">    Finished `test` profile in 9.84s</span>
+     Running tests\app_attach.rs
+running 11 tests
+test host_rect_never_goes_negative ... <span class="ok">ok</span>
+test alt_drop_attaches_to_zone_under_cursor ... <span class="ok">ok</span>
+test drop_on_occupied_zone_releases_previous ... <span class="ok">ok</span>
+test result: <span class="ok">ok</span>. 11 passed; 0 failed
+
+     Running tests\app_commands.rs
+running 14 tests
+test cycle_highlight_outlines_the_focused_windows_zone ... <span class="ok">ok</span>
+test margin_hotkeys_step_by_two_within_limits ... <span class="ok">ok</span>
+test result: <span class="ok">ok</span>. 14 passed; 0 failed
+
+     Running tests\view_theme.rs
+running 5 tests
+test result: <span class="ok">ok</span>. 5 passed; 0 failed
+
+<span class="p">PS D:\projects\fancy-window-rs\source&gt;</span> █</div></div>
+            </div>
+            <div class="z" style="left:634px;top:8px;width:398px;height:287px">
+              <div class="zh"><span class="ic" style="background:#4A90D9"></span><span class="t">notes.txt — Notepad</span><span class="k">2</span><span class="x"><svg viewBox="0 0 8 8"><path d="M0 0l8 8M8 0 0 8"/></svg></span></div>
+              <div class="host"><div class="notepad"><div class="nb"><span>File</span><span>Edit</span><span>View</span></div><div class="tx">Fancy Window 2.1
+- brighter active-zone glow
+- zone headers: icon + title
+- command palette (Ctrl+Win+P)
+- status bar shows workspace
+- check Snap Layouts on max
+  button hover (Win11)</div></div></div>
+            </div>
+            <div class="z" style="left:634px;top:303px;width:398px;height:287px">
+              <div class="zh"><span class="ic" style="background:linear-gradient(135deg,#2CC4C4,#1A73E8)"></span><span class="t">DwmSetWindowAttribute function — Microsoft Edge</span><span class="k">3</span><span class="x"><svg viewBox="0 0 8 8"><path d="M0 0l8 8M8 0 0 8"/></svg></span></div>
+              <div class="host"><div class="browser"><div class="ab"><div>learn.microsoft.com/windows/win32/api/dwmapi/nf-dwmapi-dwmsetwindowattribute</div></div><div class="pg"><b>DwmSetWindowAttribute function</b><span>Sets the value of Desktop Window Manager (DWM) non-client rendering attributes for a window.</span><div class="pre">HRESULT DwmSetWindowAttribute(
+  HWND    hwnd,
+  DWORD   dwAttribute,
+  LPCVOID pvAttribute,
+  DWORD   cbAttribute
+);</div><span>Use <code>DWMWA_SYSTEMBACKDROP_TYPE</code> to ask for Mica on Windows 11 22H2 and later.</span></div></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="sb">
+          <span class="remote"><svg viewBox="0 0 16 16"><path d="M3 2h10v12l-5-3-5 3z"/></svg>Coding</span>
+          <span><svg viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1"/><path d="M8 2.5v11M8 8h6.5"/></svg>3 zones · 3 hosted</span>
+          <span>Margin 0</span>
+          <span class="fill"></span>
+          <span>Ctrl+Win+] next window</span>
+          <span>?</span>
+          <span>v2.1.0</span>
+        </div>
+      </div>
+
+      <!-- light -->
+      <div class="scr light" data-mode="light" hidden style="width:1100px;height:660px">
+        <div class="tb">
+          <div class="logo"><i></i><i></i><i></i><i></i></div>
+          <div class="menus"><span>File</span><span>Layout</span><span>Workspaces</span><span>Help</span></div>
+          <div class="cc"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>Fancy Window — Coding</div>
+          <div class="caps">
+            <span><svg viewBox="0 0 10 10"><path d="M0 5h10"/></svg></span>
+            <span><svg viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9"/></svg></span>
+            <span><svg viewBox="0 0 10 10"><path d="M0 0l10 10M10 0 0 10"/></svg></span>
+          </div>
+        </div>
+        <div class="body">
+          <div class="rail">
+            <span class="on"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16M12 12h9"/></svg></span>
+            <span><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg></span>
+            <span><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h0M10 10h0M14 10h0M18 10h0M7 14h10"/></svg></span>
+            <i class="gap"></i>
+            <span><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></span>
+          </div>
+          <div class="canvas">
+            <div class="z" style="left:8px;top:8px;width:618px;height:582px">
+              <div class="zh"><span class="ic" style="background:#2B2B2B"></span><span class="t">PowerShell — D:\projects\fancy-window-rs\source</span><span class="k">1</span><span class="x"><svg viewBox="0 0 8 8"><path d="M0 0l8 8M8 0 0 8"/></svg></span></div>
+              <div class="host"><div class="term"><span class="p">PS D:\projects\fancy-window-rs\source&gt;</span> cargo build --release
+<span class="dim">   Compiling fancy-window v2.1.0</span>
+<span class="dim">    Finished `release` profile [optimized] in 41.2s</span>
+<span class="p">PS D:\projects\fancy-window-rs\source&gt;</span> .\scripts\package.ps1
+dist\FancyWindow-2.1.0-win64.zip
+dist\FancyWindow-2.1.0-win64.zip.sha256
+<span class="p">PS D:\projects\fancy-window-rs\source&gt;</span> █</div></div>
+            </div>
+            <div class="z active" style="left:634px;top:8px;width:398px;height:287px">
+              <div class="zh"><span class="ic" style="background:#4A90D9"></span><span class="t">notes.txt — Notepad</span><span class="k">2</span><span class="x"><svg viewBox="0 0 8 8"><path d="M0 0l8 8M8 0 0 8"/></svg></span></div>
+              <div class="host"><div class="notepad"><div class="nb"><span>File</span><span>Edit</span><span>View</span></div><div class="tx">Light theme check
+- bevel uses the accent itself,
+  not a lightened one
+- glow at 28% so it still reads
+  on white
+- headers stay #F8F8F8</div></div></div>
+            </div>
+            <div class="z empty" style="left:634px;top:303px;width:398px;height:287px">
+              <div class="hint"><span class="big">Empty zone</span><span><span class="kbd">Alt</span> + drag a window here</span><span><span class="kbd">Ctrl</span> click splits · <span class="kbd">Shift</span> click rows</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="sb">
+          <span class="remote"><svg viewBox="0 0 16 16"><path d="M3 2h10v12l-5-3-5 3z"/></svg>Coding</span>
+          <span><svg viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1"/><path d="M8 2.5v11M8 8h6.5"/></svg>3 zones · 2 hosted</span>
+          <span>Margin 0</span>
+          <span class="fill"></span>
+          <span>Ctrl+Win+] next window</span>
+          <span>?</span>
+          <span>v2.1.0</span>
+        </div>
+      </div>
+
+      <!-- today -->
+      <div class="scr old" data-mode="old" hidden style="width:1100px;height:660px">
+        <div class="ttl"><div class="tb" style="background:transparent;border:0;height:31px"><div class="logo"><i></i><i></i><i></i><i></i></div></div>Fancy Window<span style="margin-left:auto;display:flex"><span style="width:46px;text-align:center">&#8212;</span><span style="width:46px;text-align:center">&#9744;</span><span style="width:46px;text-align:center">&#10005;</span></span></div>
+        <div class="bar"><span>File</span><span>Layout</span><span>Workspaces</span><span>Help</span></div>
+        <div style="flex:1;position:relative;background:#1E1E1E">
+          <div class="oldz" style="left:0;top:0;width:664px;height:579px"><div style="position:absolute;inset:2px;border-radius:2px;overflow:hidden"><div class="term" style="height:100%"><span class="p">PS D:\projects\fancy-window-rs\source&gt;</span> cargo test
+<span class="dim">    Finished `test` profile in 9.84s</span>
+test result: <span class="ok">ok</span>. 11 passed; 0 failed
+<span class="p">PS D:\projects\fancy-window-rs\source&gt;</span> █</div></div></div>
+          <div class="oldz" style="left:664px;top:0;width:436px;height:290px"><div style="position:absolute;inset:2px;overflow:hidden"><div class="notepad"><div class="nb"><span>File</span><span>Edit</span><span>View</span></div><div class="tx">Fancy Window 2.1
+- brighter active-zone glow</div></div></div></div>
+          <div class="oldz" style="left:664px;top:290px;width:436px;height:289px"><div style="position:absolute;inset:2px;overflow:hidden"><div class="browser"><div class="ab"><div>learn.microsoft.com/windows/win32/api/dwmapi/...</div></div><div class="pg"><b>DwmSetWindowAttribute function</b></div></div></div></div>
+          <div class="oldsplit" style="left:662px;top:0;width:4px;height:579px"></div>
+          <div class="oldsplit" style="left:664px;top:288px;width:436px;height:4px"></div>
+        </div>
+        <div style="height:24px;background:#2D2D30;border-top:1px solid #3F3F46;display:flex;align-items:center;justify-content:flex-end;gap:18px;padding-right:10px;color:#9B9B9B;font-size:15px"><span>?</span><span>v2.0.0</span></div>
+      </div>
+    </div>
+    <span class="caption">Switch to "Today" to compare. Today nothing marks which hosted window has focus, and the only zone outline is the brief one after Ctrl+Win+] / [.</span>
+  </div>
+</section>
+
+<!-- ============ 1. Title bar ============ -->
+<section class="idea" id="titlebar">
+  <div class="idea-head">
+    <span class="tag">Idea 1</span>
+    <h2>One title bar for the menus and caption buttons</h2>
+    <p>VS Code puts its menus, a search box and the window buttons in one 35&nbsp;px row. Fancy Window spends 57&nbsp;DIP on a native caption plus its own menu bar. Merging them gives that space back to the zones. The centre box shows the loaded workspace and opens the command palette when clicked.</p>
+  </div>
+  <div class="figure">
+    <div class="fit" data-w="1100" data-h="250">
+      <div class="scr" style="width:1100px;height:250px">
+        <div class="tb">
+          <div class="logo"><i></i><i></i><i></i><i></i></div>
+          <div class="menus"><span>File</span><span class="open">Layout</span><span>Workspaces</span><span>Help</span></div>
+          <div class="cc"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>Fancy Window — Coding</div>
+          <div class="caps">
+            <span><svg viewBox="0 0 10 10"><path d="M0 5h10"/></svg></span>
+            <span style="background:#2D2D2D"><svg viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9"/></svg></span>
+            <span><svg viewBox="0 0 10 10"><path d="M0 0l10 10M10 0 0 10"/></svg></span>
+          </div>
+        </div>
+        <div style="flex:1;position:relative;background:var(--m-bg)">
+          <div class="dd" style="left:84px;top:2px">
+            <div class="it"><span class="thumb" data-preset="single"></span><span class="l">Single</span></div>
+            <div class="it"><span class="thumb" data-preset="cols2"></span><span class="l">Two side-by-side</span></div>
+            <div class="it"><span class="thumb" data-preset="grid"></span><span class="l">2×2 grid</span><span class="s">Ctrl+Win+R</span></div>
+            <div class="it hl"><span class="thumb" data-preset="bigleft"></span><span class="l">Big left, stacked right</span></div>
+            <div class="sep"></div>
+            <div class="it"><span class="l">Add</span><span class="chev">›</span></div>
+            <div class="it"><span class="l">Increase margin</span><span class="s">Ctrl+Win+=</span></div>
+          </div>
+          <div class="callout up" style="left:930px;top:16px">Snap Layouts flyout still works (HTMAXBUTTON)</div>
+          <div class="callout left" style="left:640px;top:76px">Owner-drawn menu with layout thumbnails</div>
+          <div class="callout up" style="left:380px;top:16px">Click or Ctrl+Win+P: command palette</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="feas">
+    <h3>What it takes in Win32</h3>
+    <div class="feas-grid">
+      <div class="stat"><span class="k">Effort</span><span class="v"><span class="pill m">Medium</span> 2–3 days</span></div>
+      <div class="stat"><span class="k">Exe size</span><span class="v">≈ 0 KB</span></div>
+      <div class="stat"><span class="k">Touches</span><span class="v mono">window.rs, view/paint.rs</span></div>
+    </div>
+    <ul>
+      <li>Handle <code>WM_NCCALCSIZE</code> (return 0 when <code>wParam</code> is TRUE) to drop the native caption, and call <code>DwmExtendFrameIntoClientArea</code> with a 1&nbsp;px top margin so the window keeps its DWM shadow and resize edges.</li>
+      <li>Answer <code>WM_NCHITTEST</code> with <code>HTCAPTION</code> over empty title-bar space and <code>HTMINBUTTON</code>/<code>HTMAXBUTTON</code>/<code>HTCLOSE</code> over the buttons. <code>HTMAXBUTTON</code> is what makes the Windows 11 Snap Layouts flyout appear.</li>
+      <li>Paint the caption glyphs with the <span class="mono">Segoe Fluent Icons</span> font (fall back to <span class="mono">Segoe MDL2 Assets</span> on Windows 10). <code>draw_menu_bar</code> already lays out and paints the menu titles, so it moves up a row.</li>
+      <li><b>Risks:</b> a maximised window overhangs the screen by the frame width, so the title row needs extra top padding then. Watch DPI changes between monitors, the inactive-window caption colour, and High Contrast mode.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 2. Zone headers + active glow ============ -->
+<section class="idea" id="zones">
+  <div class="idea-head">
+    <span class="tag">Idea 2</span>
+    <h2>Zone headers and a clear active window</h2>
+    <p>Each zone gets a 28&nbsp;px header, like an editor tab, with the hosted app's icon and title, its position in the cycle order and a button that lets the window go. The zone whose window has focus gets a 2&nbsp;px accent line on its header, a bright 1&nbsp;px bevel and a soft accent glow. Empty zones say how to fill them.</p>
+  </div>
+  <div class="figure">
+    <div class="fit" data-w="1100" data-h="380">
+      <div class="scr" style="width:1100px;height:380px">
+        <div class="canvas" style="flex:1">
+          <div class="z" style="left:24px;top:40px;width:330px;height:300px">
+            <div class="zh"><span class="ic" style="background:#4A90D9"></span><span class="t">notes.txt — Notepad</span><span class="k">2</span><span class="x"><svg viewBox="0 0 8 8"><path d="M0 0l8 8M8 0 0 8"/></svg></span></div>
+            <div class="host"><div class="notepad"><div class="nb"><span>File</span><span>Edit</span><span>View</span></div><div class="tx">Inactive zone
+20% accent tint
+1px #2B2B2B border
+muted header text</div></div></div>
+          </div>
+          <div class="z active" style="left:385px;top:40px;width:330px;height:300px">
+            <div class="zh"><span class="ic" style="background:#2B2B2B;box-shadow:inset 0 0 0 1px #4DA3FF"></span><span class="t">PowerShell</span><span class="k">1</span><span class="x"><svg viewBox="0 0 8 8"><path d="M0 0l8 8M8 0 0 8"/></svg></span></div>
+            <div class="host"><div class="term"><span class="p">PS C:\&gt;</span> Get-Date
+
+Friday, 2 October 2026 09:41:07
+
+<span class="p">PS C:\&gt;</span> █</div></div>
+          </div>
+          <div class="z empty" style="left:746px;top:40px;width:330px;height:300px">
+            <div class="hint"><span class="big">Empty zone</span><span><span class="kbd">Alt</span> + drag a window here</span><span><span class="kbd">Ctrl</span> click splits · <span class="kbd">Shift</span> click rows</span></div>
+          </div>
+          <div class="callout down" style="left:385px;top:6px">2px accent line + full-brightness title</div>
+          <div class="callout left" style="left:722px;top:200px">1px #4DA3FF bevel, 45% glow</div>
+          <div class="callout up" style="left:24px;top:348px">Window title and icon, updated on rename</div>
+        </div>
+      </div>
+    </div>
+    <span class="caption">Dark theme, default accent. The glow is drawn in the 2&nbsp;DIP gap Fancy Window already leaves around each hosted window, plus the zone header.</span>
+  </div>
+  <div class="feas">
+    <h3>What it takes in Win32</h3>
+    <div class="feas-grid">
+      <div class="stat"><span class="k">Effort</span><span class="v"><span class="pill m">Medium</span> 2–3 days</span></div>
+      <div class="stat"><span class="k">Exe size</span><span class="v">≈ 0 KB</span></div>
+      <div class="stat"><span class="k">Touches</span><span class="v mono">app/attach.rs, view/paint.rs, window.rs</span></div>
+    </div>
+    <ul>
+      <li><b>Active state:</b> an <code>EVENT_SYSTEM_FOREGROUND</code> WinEvent hook sends a new <code>Msg</code> whenever focus changes, and <code>AppState</code> records which hosted window is in front. This is the brighter glow and bevel already in progress. The headers and the glow both read that one field.</li>
+      <li><b>Header content:</b> <code>GetWindowTextW</code> for the title. For the icon, use <code>WM_GETICON</code> via <code>SendMessageTimeoutW</code> (so a hung app can't stall Fancy Window), fall back to <code>GCLP_HICONSM</code>, and draw it with <code>DrawIconEx</code>. <code>EVENT_OBJECT_NAMECHANGE</code> keeps titles current.</li>
+      <li><b>Geometry:</b> <code>host_rect</code> gains a top inset equal to the header height. It is pure, unit-tested code, so the change is small and testable.</li>
+      <li><b>Glow in GDI:</b> GDI has no alpha, so the theme pre-blends colours the way <code>Color::over</code> already does. Draw two or three concentric rounded outlines that fade from the accent toward the zone fill. A truly soft blur would need Direct2D (see the summary table).</li>
+      <li><b>Risks:</b> some apps (UWP hosts, elevated windows) won't give up their icon or title, so the header falls back to the exe name. Headers take 28&nbsp;DIP from every zone, so offer "Show zone headers" as a preference.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 3. Command palette ============ -->
+<section class="idea" id="palette">
+  <div class="idea-head">
+    <span class="tag">Idea 3</span>
+    <h2>A command palette for every layout, workspace and command</h2>
+    <p>Ctrl+Win+P (global) or a click on the title-bar box opens a filter list. You type a few letters and press Enter. It reaches all 9 layout presets, the 9 workspace slots, the margin and stay-back commands and zone edits, each with its current hotkey, so nothing needs to be found in a menu.</p>
+  </div>
+  <div class="figure">
+    <div class="fit" data-w="1100" data-h="420">
+      <div class="scr" style="width:1100px;height:420px">
+        <div class="tb">
+          <div class="logo"><i></i><i></i><i></i><i></i></div>
+          <div class="menus"><span>File</span><span>Layout</span><span>Workspaces</span><span>Help</span></div>
+          <div class="cc" style="border-color:var(--m-accent)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>Fancy Window — Coding</div>
+          <div class="caps"><span><svg viewBox="0 0 10 10"><path d="M0 5h10"/></svg></span><span><svg viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9"/></svg></span><span><svg viewBox="0 0 10 10"><path d="M0 0l10 10M10 0 0 10"/></svg></span></div>
+        </div>
+        <div class="canvas" style="flex:1">
+          <div class="z" style="left:8px;top:8px;width:640px;height:368px"></div>
+          <div class="z" style="left:656px;top:8px;width:436px;height:180px"></div>
+          <div class="z" style="left:656px;top:196px;width:436px;height:180px"></div>
+          <div class="scrim"></div>
+          <div class="pal" style="top:6px">
+            <div class="in"><span>&gt; lay big</span><span class="caret"></span></div>
+            <div class="grp"><span>Layouts</span><span>recently used</span></div>
+            <div class="row sel"><span class="thumb" data-preset="bigleft"></span><span class="lbl"><u>Lay</u>out: <u>Big</u> left, stacked right</span></div>
+            <div class="row"><span class="thumb" data-preset="bigright"></span><span class="lbl"><u>Lay</u>out: Stacked left, <u>big</u> right</span></div>
+            <div class="row"><span class="thumb" data-preset="bigtop"></span><span class="lbl"><u>Lay</u>out: <u>Big</u> top, split bottom</span></div>
+            <div class="grp"><span>Workspaces</span><span></span></div>
+            <div class="row"><span class="thumb" data-preset="bigleft"></span><span class="lbl">Workspace: Load "<u>Big</u> screen <u>lay</u>out"</span><span class="k"><span>Ctrl</span><span>Win</span><span>2</span></span></div>
+            <div class="foot"><span>↑↓ move</span><span>Enter apply</span><span>Esc close</span><span style="margin-left:auto">4 of 31</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="feas">
+    <h3>What it takes in Win32</h3>
+    <div class="feas-grid">
+      <div class="stat"><span class="k">Effort</span><span class="v"><span class="pill m">Medium</span> 2 days</span></div>
+      <div class="stat"><span class="k">Exe size</span><span class="v">≈ 5–10 KB</span></div>
+      <div class="stat"><span class="k">Touches</span><span class="v mono">new app/palette.rs, platform/palette.rs</span></div>
+    </div>
+    <ul>
+      <li>Most of the data already exists. <code>menu_bar()</code>, <code>PRESETS</code>, <code>workspace_menu()</code> and <code>CONFIGURABLE</code> already describe every action as plain <code>MenuItem</code> data with labels and chords. Flattening that tree gives the palette list for free.</li>
+      <li>The filtering and ranking go in <code>app/</code> as a pure function, unit-tested like the rest of the model. The platform side is one owned <code>WS_POPUP</code> with an <code>EDIT</code> control, an owner-drawn list painted with the existing <code>gdi</code> helpers, and the existing <code>Dialog</code> message loop for keys.</li>
+      <li>Chosen items go back as <code>Msg::Menu(action)</code>, the same way menu picks do now, so no new behaviour paths are needed.</li>
+      <li><b>Risks:</b> a global Ctrl+Win+P may already be taken. The shortcuts dialog already detects that and lets the user pick another chord.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 4. Status bar ============ -->
+<section class="idea" id="statusbar">
+  <div class="idea-head">
+    <span class="tag">Idea 4</span>
+    <h2>A status bar that shows what's happening</h2>
+    <p>Today the status bar shows "?" and the version. In VS Code it is the quickest place to read state. Here it would show the workspace (click to switch), how many zones hold windows, the margin (click to step it), and a warning segment while Fancy Window is held at the back.</p>
+  </div>
+  <div class="figure">
+    <div class="fit" data-w="1100" data-h="150">
+      <div class="scr" style="width:1100px;height:150px;justify-content:space-around;padding:10px 0;background:#141414">
+        <div style="height:24px;background:#2D2D30;border-top:1px solid #3F3F46;display:flex;align-items:center;gap:18px;padding:0 10px;color:#9B9B9B;font-size:15px"><span style="font-size:11px;letter-spacing:.08em;color:#777">TODAY</span><span style="margin-left:auto">?</span><span>v2.0.0</span></div>
+        <div class="sb">
+          <span class="remote"><svg viewBox="0 0 16 16"><path d="M3 2h10v12l-5-3-5 3z"/></svg>Coding</span>
+          <span><svg viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1"/><path d="M8 2.5v11M8 8h6.5"/></svg>4 zones · 3 hosted</span>
+          <span>Margin 4</span>
+          <span class="fill"></span>
+          <span>Ctrl+Win+] next window</span><span>?</span><span>v2.1.0</span>
+        </div>
+        <div class="sb">
+          <span class="remote">Profile: work</span>
+          <span class="warnseg"><svg viewBox="0 0 16 16"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>Held at the back · Ctrl+Win+H brings it forward</span>
+          <span>4 zones · 4 hosted</span>
+          <span class="fill"></span><span>?</span><span>v2.1.0</span>
+        </div>
+        <div class="sb quiet">
+          <span class="remote">Coding</span><span>4 zones · 3 hosted</span><span>Margin 4</span><span class="fill"></span><span>?</span><span>v2.1.0</span>
+        </div>
+      </div>
+    </div>
+    <span class="caption">Top to bottom: today; proposed; proposed in a <span class="mono">--profile work</span> instance held at the back; a quieter variant that only colours the workspace segment.</span>
+  </div>
+  <div class="feas">
+    <h3>What it takes in Win32</h3>
+    <div class="feas-grid">
+      <div class="stat"><span class="k">Effort</span><span class="v"><span class="pill s">Small</span> under a day</span></div>
+      <div class="stat"><span class="k">Exe size</span><span class="v">≈ 0 KB</span></div>
+      <div class="stat"><span class="k">Touches</span><span class="v mono">view/paint.rs, app/state.rs</span></div>
+    </div>
+    <ul>
+      <li><code>draw_status_bar</code> already paints segments and <code>status_help_rect</code> already hit-tests one. Generalise that into a list of segments, each with a <code>MenuAction</code>, and send clicks through the existing <code>Msg::Menu</code>.</li>
+      <li>Everything shown is already in <code>AppState</code> (<code>attachments</code>, <code>margin</code>, <code>stay_back</code>, <code>profile</code>) except the loaded workspace name. Add one <code>Option&lt;usize&gt;</code> that <code>workspace::load</code> sets and any layout edit clears.</li>
+      <li>The stay-back segment could replace the floating "Fancy Window is behind" reminder. That isn't safe, though: the reminder exists because Fancy Window itself is out of sight then. Keep both.</li>
+      <li><b>Risks:</b> very few. White text on light accents (the yellow and green swatches) needs a contrast check. Pick black text when the accent's <code>is_light()</code> is true.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 5. Activity rail ============ -->
+<section class="idea" id="rail">
+  <div class="idea-head">
+    <span class="tag">Idea 5</span>
+    <h2>An activity rail with layouts you can see</h2>
+    <p>A 48&nbsp;px rail on the left opens a side panel. The panel shows the nine preset layouts as thumbnails and the workspace slots with their hotkeys. Clicking a thumbnail applies it, carrying windows over in reading order as the Layout menu does now. The panel closes with the rail button or Ctrl+B, so the zones get the full width back.</p>
+  </div>
+  <div class="figure">
+    <div class="fit" data-w="1100" data-h="520">
+      <div class="scr" style="width:1100px;height:520px">
+        <div class="tb">
+          <div class="logo"><i></i><i></i><i></i><i></i></div>
+          <div class="menus"><span>File</span><span>Layout</span><span>Workspaces</span><span>Help</span></div>
+          <div class="cc"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>Fancy Window — Coding</div>
+          <div class="caps"><span><svg viewBox="0 0 10 10"><path d="M0 5h10"/></svg></span><span><svg viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9"/></svg></span><span><svg viewBox="0 0 10 10"><path d="M0 0l10 10M10 0 0 10"/></svg></span></div>
+        </div>
+        <div class="body">
+          <div class="rail">
+            <span class="on"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16M12 12h9"/></svg></span>
+            <span><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg></span>
+            <span><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h0M10 10h0M14 10h0M18 10h0M7 14h10"/></svg></span>
+            <i class="gap"></i>
+            <span><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></span>
+          </div>
+          <div class="side">
+            <h4>Layouts</h4>
+            <div class="sec">Presets</div>
+            <div class="presets" id="preset-grid"></div>
+            <div class="sec">Workspaces</div>
+            <div class="ws cur"><span class="n">1</span><span class="nm">Coding</span><span class="kbd">Ctrl+Win+1</span></div>
+            <div class="ws"><span class="n">2</span><span class="nm">Big screen layout</span><span class="kbd">Ctrl+Win+2</span></div>
+            <div class="ws"><span class="n">3</span><span class="nm">Reading</span></div>
+            <div class="ws" style="color:var(--m-muted)"><span class="n">+</span><span class="nm">Save current as…</span></div>
+          </div>
+          <div class="canvas">
+            <div class="z active" style="left:8px;top:8px;width:470px;height:434px">
+              <div class="zh"><span class="ic" style="background:#2B2B2B;box-shadow:inset 0 0 0 1px #4DA3FF"></span><span class="t">PowerShell</span><span class="k">1</span></div>
+              <div class="host"><div class="term"><span class="p">PS C:\&gt;</span> █</div></div>
+            </div>
+            <div class="z" style="left:486px;top:8px;width:298px;height:213px">
+              <div class="zh"><span class="ic" style="background:#4A90D9"></span><span class="t">notes.txt — Notepad</span><span class="k">2</span></div>
+              <div class="host"><div class="notepad"><div class="nb"><span>File</span><span>Edit</span></div><div class="tx">panel open: canvas
+is 300 DIP narrower</div></div></div>
+            </div>
+            <div class="z empty" style="left:486px;top:229px;width:298px;height:213px"><div class="hint"><span><span class="kbd">Alt</span> + drag a window here</span></div></div>
+          </div>
+        </div>
+        <div class="sb"><span class="remote">Coding</span><span>3 zones · 2 hosted</span><span class="fill"></span><span>?</span><span>v2.1.0</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="feas">
+    <h3>What it takes in Win32</h3>
+    <div class="feas-grid">
+      <div class="stat"><span class="k">Effort</span><span class="v"><span class="pill m">Medium</span> 2–3 days</span></div>
+      <div class="stat"><span class="k">Exe size</span><span class="v">≈ 0 KB</span></div>
+      <div class="stat"><span class="k">Touches</span><span class="v mono">view/mod.rs, view/paint.rs, app/state.rs</span></div>
+    </div>
+    <ul>
+      <li>The thumbnails cost nothing extra: <code>GridLayout::zone_rects</code> already computes zone rectangles for any canvas size, so each preset is drawn by asking for a 72×45 canvas.</li>
+      <li><code>canvas_size</code> and <code>Frame</code> gain a left offset (rail width, plus the panel when open). <code>update()</code> already reflows hosted windows whenever the frame changes, so opening the panel moves them automatically.</li>
+      <li>Icons are glyphs from <span class="mono">Segoe Fluent Icons</span> drawn with <code>DrawTextW</code>, so there are no image assets and no size cost.</li>
+      <li><b>Risks:</b> this changes how much room a fresh window gives its zones. Keep the panel closed by default and remember its state in <code>settings.json</code>. Of the five ideas, the rail is the one users could do without most easily.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ Summary table ============ -->
+<section class="idea" id="summary">
+  <div class="idea-head">
+    <div class="eyebrow">Everything considered</div>
+    <h2>Feasibility at a glance</h2>
+    <p>These include three ideas without a mockup. They change how the app feels more than what it shows.</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Idea</th><th>Win32 approach</th><th>Effort</th><th>Exe size</th><th>Main risk</th></tr></thead>
+      <tbody>
+        <tr><td>Status bar with live state</td><td>Segments in <code>draw_status_bar</code>, clicks as <code>Msg::Menu</code></td><td><span class="pill s">Small</span></td><td class="num">≈ 0 KB</td><td>Text contrast on light accents</td></tr>
+        <tr><td>Segoe UI Variable + Cascadia typography</td><td>Change the face name in <code>gdi::with_font</code>; 13&nbsp;px UI text like VS Code; mono face for chords</td><td><span class="pill s">Small</span></td><td class="num">0 KB</td><td>Win10 has neither font; fall back to Segoe UI / Consolas</td></tr>
+        <tr><td>Active-zone glow + bevel</td><td><code>EVENT_SYSTEM_FOREGROUND</code> hook, pre-blended outlines</td><td><span class="pill s">Small</span></td><td class="num">≈ 0 KB</td><td>Already in progress; GDI glow is stepped, not blurred</td></tr>
+        <tr><td>Zone headers</td><td><code>GetWindowTextW</code>, <code>WM_GETICON</code>, <code>host_rect</code> top inset</td><td><span class="pill m">Medium</span></td><td class="num">≈ 0 KB</td><td>Apps that hide their icon; less space per zone</td></tr>
+        <tr><td>Unified title bar</td><td><code>WM_NCCALCSIZE</code> + <code>WM_NCHITTEST</code> + DWM frame</td><td><span class="pill m">Medium</span></td><td class="num">≈ 0 KB</td><td>Maximised insets, Snap Layouts, High Contrast</td></tr>
+        <tr><td>Command palette</td><td>Popup + EDIT + owner-drawn list over flattened menu data</td><td><span class="pill m">Medium</span></td><td class="num">5–10 KB</td><td>Default chord may be taken</td></tr>
+        <tr><td>Activity rail + side panel</td><td>New painted region, <code>Frame</code> left offset</td><td><span class="pill m">Medium</span></td><td class="num">≈ 0 KB</td><td>Takes width from zones</td></tr>
+        <tr><td>Owner-drawn popup menus</td><td><code>MF_OWNERDRAW</code> + <code>WM_MEASUREITEM</code>/<code>WM_DRAWITEM</code></td><td><span class="pill m">Medium</span></td><td class="num">≈ 0 KB</td><td>The menu's own border and shadow stay system-drawn; the dark-mode ordinals already cover most of the look</td></tr>
+        <tr><td>Mica backdrop</td><td><code>DWMWA_SYSTEMBACKDROP_TYPE</code> = <code>DWMSBT_MAINWINDOW</code> on Win11 22H2+</td><td><span class="pill l">Large</span></td><td class="num">≈ 0 KB</td><td>GDI can't draw alpha, so text over Mica needs <code>DrawThemeTextEx</code> or Direct2D; hosted windows cover most of it anyway</td></tr>
+        <tr><td>Direct2D + DirectWrite renderer</td><td>Swap <code>view/gdi.rs</code> for an <code>ID2D1HwndRenderTarget</code>; real blur for the glow</td><td><span class="pill l">Large</span></td><td class="num">≈ 150–300 KB</td><td>Rewrites every paint path; only worth it if Mica or a soft glow becomes a must</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ Order ============ -->
+<section class="idea" id="order">
+  <div class="idea-head">
+    <div class="eyebrow">Recommendation</div>
+    <h2>Suggested build order</h2>
+    <p>Small, self-contained wins come first. Each step leaves the app shippable and keeps the Model-View-Update split intact: new state and logic go in <code>app/</code> with tests, and pixels go in <code>view/</code>.</p>
+  </div>
+  <ol class="order">
+    <li><div><b>Active-zone glow and bevel, plus the typography swap.</b> The glow is already being built. The font change is one line with a fallback. Together they make the app look current with almost no risk.</div></li>
+    <li><div><b>Live status bar.</b> Under a day, and it answers "which workspace am I in?" and "is it held at the back?" at a glance.</div></li>
+    <li><div><b>Zone headers.</b> The biggest usability gain: you can tell what's in each zone without hunting for it, and you can release a window with one click. Ship it behind a preference.</div></li>
+    <li><div><b>Unified title bar.</b> This is the change that makes it look like VS Code, and it returns about 26&nbsp;DIP of height. Test it on a maximised window, across mixed-DPI monitors, and with Snap Layouts.</div></li>
+    <li><div><b>Command palette.</b> Most of the plumbing exists already. Do it once the title-bar box is there to open it.</div></li>
+    <li><div><b>Later, or never:</b> the activity rail (nice, but it takes width), owner-drawn menus, and Mica. Mica only makes sense together with a Direct2D renderer.</div></li>
+  </ol>
+</section>
+
+</main>
+
+<script>
+(function () {
+  // Preset thumbnails: zone rects as percentages, matching app/menu.rs PRESETS.
+  var P = {
+    single: [[0,0,100,100]],
+    rows2: [[0,0,100,49],[0,51,100,49]],
+    cols2: [[0,0,49,100],[51,0,49,100]],
+    grid: [[0,0,49,49],[51,0,49,49],[0,51,49,49],[51,51,49,49]],
+    rows3: [[0,0,100,32],[0,34,100,32],[0,68,100,32]],
+    cols3: [[0,0,32,100],[34,0,32,100],[68,0,32,100]],
+    bigleft: [[0,0,65,100],[67,0,33,49],[67,51,33,49]],
+    bigright: [[0,0,33,49],[0,51,33,49],[35,0,65,100]],
+    bigtop: [[0,0,100,65],[0,67,49,33],[51,67,49,33]]
+  };
+  function paint(el, name) {
+    (P[name] || []).forEach(function (r) {
+      var i = document.createElement("i");
+      i.style.cssText = "left:calc(" + r[0] + "% + 2px);top:calc(" + r[1] + "% + 2px);width:calc(" + r[2] + "% - 4px);height:calc(" + r[3] + "% - 4px)";
+      el.appendChild(i);
+    });
+  }
+  document.querySelectorAll(".thumb[data-preset]").forEach(function (t) { paint(t, t.getAttribute("data-preset")); });
+  var grid = document.getElementById("preset-grid");
+  if (grid) {
+    ["single","rows2","cols2","grid","rows3","cols3","bigleft","bigright","bigtop"].forEach(function (n) {
+      var t = document.createElement("span");
+      t.className = "thumb" + (n === "bigleft" ? " cur" : "");
+      paint(t, n);
+      grid.appendChild(t);
+    });
+  }
+
+  // Scale each fixed-size mockup to its column.
+  var fits = Array.prototype.slice.call(document.querySelectorAll(".fit"));
+  fits.forEach(function (f) { f.style.aspectRatio = f.dataset.w + " / " + f.dataset.h; });
+  function fit(f) { f.style.setProperty("--s", f.clientWidth / Number(f.dataset.w)); }
+  fits.forEach(fit);
+  if ("ResizeObserver" in window) {
+    var ro = new ResizeObserver(function (entries) { entries.forEach(function (e) { fit(e.target); }); });
+    fits.forEach(function (f) { ro.observe(f); });
+  } else {
+    window.addEventListener("resize", function () { fits.forEach(fit); });
+  }
+
+  // Hero version toggle.
+  var buttons = document.querySelectorAll(".toggle button[data-target]");
+  function show(mode, save) {
+    var hero = document.getElementById("hero");
+    hero.querySelectorAll(".scr").forEach(function (s) { s.hidden = s.dataset.mode !== mode; });
+    buttons.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.mode === mode)); });
+    if (save) { try { localStorage.setItem("fw-hero", mode); } catch (e) {} }
+  }
+  buttons.forEach(function (b) { b.addEventListener("click", function () { show(b.dataset.mode, true); }); });
+  try { var m = localStorage.getItem("fw-hero"); if (m === "new" || m === "light" || m === "old") show(m, false); } catch (e) {}
+})();
+</script>
+
+</body></html>

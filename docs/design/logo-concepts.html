@@ -1,0 +1,196 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fancy Window Logo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Schibsted+Grotesk:wght@600;800&display=swap">
+<style>
+/* Layout: one column of concept rows; each row pairs a large mark with the real icon sizes on dark and light desktops. */
+:root {
+  --bg: #F3F5F8;
+  --surface: #FFFFFF;
+  --fg: #1A1E26;
+  --muted: #5A6373;
+  --rule: #DCE1E8;
+  --accent: #0063B8;
+  --font-display: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+  /* The two desktops every icon is judged on; fixed, since the mark must work on both. */
+  --desk-dark: #16191E;
+  --desk-dark-bar: #1F2329;
+  --desk-light: #EEF1F5;
+  --desk-light-bar: #F9FAFB;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1116; --surface: #171A21; --fg: #E4E7ED; --muted: #9AA3B3; --rule: #2A303A; --accent: #5AAEFF;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1116; --surface: #171A21; --fg: #E4E7ED; --muted: #9AA3B3; --rule: #2A303A; --accent: #5AAEFF;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 400 16px/1.6 var(--font-body); }
+.page { max-width: 1040px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 72px; display: grid; gap: 40px; }
+h1, h2 { font-family: var(--font-display); margin: 0; line-height: 1.15; text-wrap: balance; }
+h1 { font-size: clamp(1.9rem, 4.6vw, 2.8rem); font-weight: 800; letter-spacing: -0.02em; }
+h2 { font-size: 1.35rem; font-weight: 800; }
+p { margin: 0; max-width: 66ch; }
+.lede { color: var(--muted); font-size: 1.08rem; }
+.eyebrow { font: 600 0.74rem/1 var(--font-body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+header { display: grid; gap: 14px; }
+
+.concept { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 28px; padding: 24px; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; }
+.hero { border-radius: 8px; background: var(--desk-dark); display: grid; place-items: center; aspect-ratio: 1; max-width: 100%; }
+.hero svg { width: 62%; height: auto; }
+.info { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.info .tag { font: 500 0.8rem/1 var(--font-mono); color: var(--muted); }
+.sizes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.desk { border-radius: 8px; padding: 14px 16px; display: grid; gap: 12px; }
+.desk.dark { background: var(--desk-dark); color: #C9CED6; }
+.desk.light { background: var(--desk-light); color: #3B4250; }
+.row { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.row figure { margin: 0; display: grid; justify-items: center; gap: 6px; }
+.row figcaption { font: 400 0.7rem/1 var(--font-mono); opacity: .7; }
+.taskbar { display: flex; align-items: center; gap: 6px; border-radius: 6px; padding: 6px 8px; }
+.dark .taskbar { background: var(--desk-dark-bar); }
+.light .taskbar { background: var(--desk-light-bar); box-shadow: 0 0 0 1px #DDE2E8; }
+.taskbar span { width: 36px; height: 32px; display: grid; place-items: center; border-radius: 4px; }
+.taskbar span.on { background: rgb(127 127 127 / .16); position: relative; }
+.taskbar span.on::after { content: ""; position: absolute; bottom: 1px; width: 14px; height: 3px; border-radius: 2px; background: #4DA3FF; }
+.taskbar i { width: 16px; height: 16px; border-radius: 3px; background: rgb(127 127 127 / .35); }
+.notes { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; color: var(--muted); font-size: 0.94rem; }
+.pick { font-weight: 600; color: var(--fg); }
+
+@media (max-width: 760px) {
+  .concept { grid-template-columns: minmax(0, 1fr); }
+  .hero { max-width: 240px; }
+  .sizes { grid-template-columns: minmax(0, 1fr); }
+}
+</style>
+
+<!-- Shared glow filter; the glowing tile is the accent, everything else is one neutral. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+</svg>
+
+<main class="page">
+<header>
+  <div class="eyebrow">Fancy Window · app icon</div>
+  <h1>Four marks, one lit zone</h1>
+  <p class="lede">Each mark is a layout Fancy Window can make, drawn in a single neutral with one zone lit in the accent, the way the app now lights the window you're working in. None uses a 2×2 grid. Judge them at 16 and 32&nbsp;px on the taskbar strips: that's where an icon is seen most.</p>
+</header>
+
+<template id="m-focus">
+  <svg viewBox="0 0 64 64" role="img" aria-label="Focus mark">
+    <rect x="6" y="6" width="31" height="52" rx="6" fill="var(--n)"/>
+    <rect x="41" y="34" width="17" height="24" rx="5" fill="var(--n)"/>
+    <rect x="41" y="6" width="17" height="24" rx="5" fill="#4DA3FF" filter="var(--f)"/>
+  </svg>
+</template>
+<template id="m-stride">
+  <svg viewBox="0 0 64 64" role="img" aria-label="Stride mark">
+    <rect x="6" y="8" width="13" height="48" rx="5" fill="var(--n)"/>
+    <rect x="23" y="8" width="22" height="48" rx="5" fill="#4DA3FF" filter="var(--f)"/>
+    <rect x="49" y="8" width="9" height="48" rx="4.5" fill="var(--n)"/>
+  </svg>
+</template>
+<template id="m-pane">
+  <svg viewBox="0 0 64 64" role="img" aria-label="Pane mark">
+    <rect x="7" y="7" width="50" height="50" rx="11" fill="none" stroke="var(--n)" stroke-width="5"/>
+    <rect x="31" y="31" width="18" height="18" rx="4" fill="#4DA3FF" filter="var(--f)"/>
+  </svg>
+</template>
+<template id="m-outline">
+  <svg viewBox="0 0 64 64" role="img" aria-label="Outline mark">
+    <rect x="7.5" y="7.5" width="28" height="49" rx="6" fill="none" stroke="var(--n)" stroke-width="4"/>
+    <rect x="41.5" y="35.5" width="15" height="21" rx="5" fill="none" stroke="var(--n)" stroke-width="4"/>
+    <rect x="39.5" y="5.5" width="19" height="25" rx="6" fill="#4DA3FF" filter="var(--f)"/>
+  </svg>
+</template>
+
+<div id="concepts"></div>
+</main>
+
+<script>
+(function () {
+  var concepts = [
+    { id: "focus", name: "A · Focus", tag: "Big left, stacked right",
+      notes: ["The app's signature layout: three zones, the top-right one lit.", "Solid shapes stay crisp at 16 px; the lit tile still reads as a separate block.", "Closest to the mockups, so it ties the icon to the restyle."] },
+    { id: "stride", name: "B · Stride", tag: "Three columns, middle lit",
+      notes: ["Unequal columns, like Linear-style bars; reads as resizable zones.", "Very bold at 16 px, but alone it could suggest a chart or an equaliser.", "Simplest to draw, so it scales down best."] },
+    { id: "pane", name: "C · Pane", tag: "A frame holding one lit window",
+      notes: ["Most minimal: one monoline frame and one tile, in the spirit of SpaceX or ChatGPT marks.", "Says 'a window placed inside a host' rather than 'a grid'.", "At 16 px the frame thins to about 1 px; it holds up, but only just."] },
+    { id: "outline", name: "D · Outline", tag: "Focus layout in line, lit tile solid",
+      notes: ["Focus drawn as outlines, so the one solid lit tile does all the talking.", "Lightest and most 'technical' of the four.", "Outlines get fiddly below 24 px; the 16 px file would need its own simplified drawing."] }
+  ];
+  var host = document.getElementById("concepts");
+
+  function mark(id, neutral, size, glow) {
+    var svg = document.getElementById("m-" + id).content.firstElementChild.cloneNode(true);
+    svg.style.setProperty("--n", neutral);
+    // A blur at 16 px just smears; small sizes get the flat tile, as the shipped .ico would.
+    svg.style.setProperty("--f", glow ? "url(#glow)" : "none");
+    if (size) { svg.setAttribute("width", size); svg.setAttribute("height", size); }
+    return svg;
+  }
+
+  function desk(kind, id) {
+    var neutral = kind === "dark" ? "#D5DAE1" : "#3A414C";
+    var d = document.createElement("div");
+    d.className = "desk " + kind;
+    var row = document.createElement("div");
+    row.className = "row";
+    [64, 48, 32, 16].forEach(function (s) {
+      var f = document.createElement("figure");
+      f.appendChild(mark(id, neutral, s, s >= 48));
+      var c = document.createElement("figcaption");
+      c.textContent = s + " px";
+      f.appendChild(c);
+      row.appendChild(f);
+    });
+    var bar = document.createElement("div");
+    bar.className = "taskbar";
+    bar.setAttribute("aria-label", kind + " taskbar at 16 px");
+    for (var i = 0; i < 5; i++) {
+      var slot = document.createElement("span");
+      if (i === 2) { slot.className = "on"; slot.appendChild(mark(id, neutral, 20, false)); }
+      else { slot.appendChild(document.createElement("i")); }
+      bar.appendChild(slot);
+    }
+    d.appendChild(row);
+    d.appendChild(bar);
+    return d;
+  }
+
+  concepts.forEach(function (c) {
+    var sec = document.createElement("section");
+    sec.className = "concept";
+    var hero = document.createElement("div");
+    hero.className = "hero";
+    hero.appendChild(mark(c.id, "#D5DAE1", null, true));
+    var info = document.createElement("div");
+    info.className = "info";
+    info.innerHTML = '<span class="tag"></span><h2></h2><ul class="notes"></ul><div class="sizes"></div>';
+    info.querySelector(".tag").textContent = c.tag;
+    info.querySelector("h2").textContent = c.name;
+    var ul = info.querySelector(".notes");
+    c.notes.forEach(function (n) { var li = document.createElement("li"); li.textContent = n; ul.appendChild(li); });
+    var sizes = info.querySelector(".sizes");
+    sizes.appendChild(desk("dark", c.id));
+    sizes.appendChild(desk("light", c.id));
+    sec.appendChild(hero);
+    sec.appendChild(info);
+    host.appendChild(sec);
+  });
+})();
+</script>
